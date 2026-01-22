@@ -1,0 +1,54 @@
+// @use 'layout';
+@use 'variables'  as *;
+@use 'helpers';
+@use 'login';
+@use 'layout';
+@use 'appstyles';
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+
+body {
+    font-size: 13px !important;
+    color: #676a6c !important;
+    overflow-x: auto !important;
+    font-display: swap !important;
+    font-family: $font-family !important;
+ 
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+p {
+    color: #b3b3b3;
+    font-weight: 300;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.h1,
+.h2,
+.h3,
+.h4,
+.h5,
+.h6 {
+    font-family: $font-family;
+}
+
+a {
+    -webkit-transition: .3s all ease;
+    -o-transition: .3s all ease;
+    transition: .3s all ease;
+}
+
+a:hover {
+    text-decoration: none !important;
+}
+ 
+  

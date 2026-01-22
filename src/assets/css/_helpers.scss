@@ -1,0 +1,71 @@
+@use "sass:string";
+
+$spaceamounts: (5, 10, 15, 20, 25, 30); // Adjust this to include the pixel amounts you need.
+$sides: (top, bottom, left, right); // Leave this variable alone
+$font-sizes: (12, 13, 14, 15, 16, 18, 20, 24, 30, 36, 48, 60, 72); // Font sizes in px
+$font-weights: (100, 200, 300, 400, 500, 600, 700, 800, 900); // Font weights in numbers
+
+// Individual sides: mt-10, mb-10, ml-10, mr-10, pt-10, pb-10, pl-10, pr-10
+
+
+@each $space in $spaceamounts {
+  @each $side in $sides {
+    $short: string.slice($side, 1, 1); // get first letter (t/b/l/r)
+
+    .m#{$short}-#{$space} {
+      margin-#{$side}: #{$space}px !important;
+    }
+
+    .p#{$short}-#{$space} {
+      padding-#{$side}: #{$space}px !important;
+    }
+  }
+}
+
+// All sides: m-10, p-10
+@each $space in $spaceamounts {
+    .m-#{$space} {
+        margin: #{$space}px !important;
+    }
+    .p-#{$space} {
+        padding: #{$space}px !important;
+    }
+}
+
+
+// X & Y spacing: mx-10, px-10, my-10, py-10
+@each $space in $spaceamounts {
+  // X = left + right
+  .mx-#{$space} {
+    margin-left: #{$space}px !important;
+    margin-right: #{$space}px !important;
+  }
+
+  .px-#{$space} {
+    padding-left: #{$space}px !important;
+    padding-right: #{$space}px !important;
+  }
+
+  // Y = top + bottom
+  .my-#{$space} {
+    margin-top: #{$space}px !important;
+    margin-bottom: #{$space}px !important;
+  }
+
+  .py-#{$space} {
+    padding-top: #{$space}px !important;
+    padding-bottom: #{$space}px !important;
+  }
+}
+// Font sizes: tx-12, tx-13, tx-14, etc.
+@each $size in $font-sizes {
+    .tx-#{$size} {
+        font-size: #{$size}px !important;
+    }
+}
+// Font weights: _100, _200, _300, etc.
+@each $weight in $font-weights {
+    ._#{$weight} {
+        font-weight: #{$weight} !important;
+    }
+}

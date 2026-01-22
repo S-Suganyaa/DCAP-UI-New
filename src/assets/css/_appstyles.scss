@@ -1,0 +1,59 @@
+@use 'variables' as *;
+
+.tree-node {
+    &.tree-node-clickable {
+        cursor: pointer;
+    }
+    .tree-toggle-icon {
+        font-size: 14px;
+        color: #666;
+        margin-top: 2px;
+    }
+    .tree-label {
+        font-size: 14px;
+        font-weight: 500;
+
+        &.tree-label-template {
+            font-weight: 600;
+        }
+
+        &.tree-label-section {
+            font-weight: 500;
+        }
+    }
+}
+
+.tree-children-connector {
+    border-left: 1px solid $abs-gray;
+    margin-left: 8px;
+    padding-left: 15px;
+}
+
+.tree-container {
+    // min-height: 100vh;
+    padding: 20px;
+
+    .tree-card {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .tree-scroll-area {
+        max-height: calc(100vh - 120px );
+        overflow-y: auto;
+    }
+}
+
+.table>thead>tr>th{
+    color: $abs-white !important;
+    background-color: $abs-navy-blue;
+}
+.table>tbody>tr.evenStriped{
+    background-color: $abs--table-bg !important;
+}
+.dcap-ui .custom-react-table .evenStriped  {
+    background-color:#8a8383 !important;
+}
+.dcap-ui .table{
+    background-color: unset !important;
+}

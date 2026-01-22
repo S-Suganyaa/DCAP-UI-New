@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" }, 
+  ],
+  "compilerOptions": {
+    "declaration": true
+  },
+  "include": [
+    "src",
+    "src/declarations.d.ts"
+  ]
+}
