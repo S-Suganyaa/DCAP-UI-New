@@ -1,8 +1,10 @@
 import React from 'react';
 import { Container, Nav, Navbar } from 'react-bootstrap';
-import Offcanvas from 'react-bootstrap/Offcanvas'; 
+import Offcanvas from 'react-bootstrap/Offcanvas';
+import { Link, useNavigate } from 'react-router-dom';
 
 const HeaderMenu: React.FC = () => {
+    const navigate = useNavigate();
 
     type SidebarChildItem = {
         id: string;
@@ -24,15 +26,12 @@ const HeaderMenu: React.FC = () => {
     };
 
     const sidebarData: SidebarMenuItem[] = [
-
         {
             id: "Allprojects",
             title: "Projects",
-
-            link: "/",
+            link: "/app/Project",
             enabled: true,
             sidebarEnabled: false,
-
             megaMenu: false,
             refresh: false,
             items: [],
@@ -40,7 +39,6 @@ const HeaderMenu: React.FC = () => {
         {
             id: "Activity",
             title: "Recent Activity",
-
             link: "/",
             enabled: true,
             sidebarEnabled: false,
@@ -51,44 +49,39 @@ const HeaderMenu: React.FC = () => {
         {
             id: "ProjectConfiguration",
             title: "Project Configuration",
-
             link: "",
-
             enabled: false,
             sidebarEnabled: true,
-
             megaMenu: false,
             refresh: false,
             items: [
                 {
                     id: "ManageTemplate",
                     name: "Manage Templates",
-                    to: "/Managetemplate",
-                    navlink: "Configuration/Managetemplate",
+                    to: "/app/Configuration/Managetemplate",
+                    navlink: "/app/Configuration/Managetemplate",
                     refresh: false,
                 },
                 {
                     id: "ManageTanks",
                     name: "Manage Tanks",
-                    to: "/Managetanks",
-                    navlink: "Configuration/Managetanks",
+                    to: "/app/Configuration/Managetanks",
+                    navlink: "/app/Configuration/Managetanks",
                     refresh: false,
-
                 },
                 {
                     id: "ManageGrading",
                     name: "Manage ABS Grading",
-                    to: "/Managegrading",
-                    navlink: "Configuration/Managegrading",
+                    to: "/app/Configuration/Manageabsgrading",
+                    navlink: "/app/Configuration/Manageabsgrading",
                     refresh: false,
                 },
                 {
                     id: "ManageDescription",
                     name: "Manage Description",
-                    to: "/Managedescriptions",
-                    navlink: "Configuration/Managedescriptions",
+                    to: "/app/Configuration/Managedescriptions",
+                    navlink: "/app/Configuration/Managedescriptions",
                     refresh: false,
-
                 },
                 {
                     id: "ManageExport",
@@ -96,19 +89,15 @@ const HeaderMenu: React.FC = () => {
                     to: "",
                     navlink: "",
                     refresh: false,
-
                 },
             ],
         },
         {
             id: "ABSAdmin",
             title: "ABS Admin",
-
             link: "",
-
             enabled: false,
             sidebarEnabled: true,
-
             megaMenu: false,
             refresh: false,
             items: [
@@ -125,7 +114,6 @@ const HeaderMenu: React.FC = () => {
                     to: "",
                     navlink: "",
                     refresh: false,
-
                 },
                 {
                     id: "ManagePermission",
@@ -134,13 +122,18 @@ const HeaderMenu: React.FC = () => {
                     navlink: "",
                     refresh: false,
                 }
-
             ],
         },
     ]
 
-      const menuList = sidebarData.filter((m) => m.enabled || m.sidebarEnabled);
+    const menuList = sidebarData.filter((m) => m.enabled || m.sidebarEnabled);
 
+    const handleNavClick = (e: React.MouseEvent, navlink: string) => {
+        e.preventDefault();
+        if (navlink && navlink !== "#") {
+            navigate(navlink);
+        }
+    };
 
     return (
         <>
@@ -171,9 +164,15 @@ const HeaderMenu: React.FC = () => {
                                                         key={menu.id}
                                                         className={hasChildren ? "nav-item has-child" : "nav-item"}
                                                     >
-                                                        <Nav.Link href={menu.link || "#"}>
-                                                            {menu.title}
-                                                        </Nav.Link>
+                                                        {menu.link ? (
+                                                            <Link to={menu.link} className="nav-link">
+                                                                {menu.title}
+                                                            </Link>
+                                                        ) : (
+                                                            <Nav.Link href={menu.link || "#"}>
+                                                                {menu.title}
+                                                            </Nav.Link>
+                                                        )}
 
                                                         {/* Dropdown */}
                                                         {hasChildren && (
@@ -181,12 +180,22 @@ const HeaderMenu: React.FC = () => {
                                                                 <ul className="child-items">
                                                                     {menu.items.map((child) => (
                                                                         <li key={child.id}>
-                                                                            <Nav.Link
-                                                                                href={child.to || child.navlink || "#"}
-                                                                                className="child-nav-link"
-                                                                            >
-                                                                                {child.name}
-                                                                            </Nav.Link>
+                                                                            {child.navlink && child.navlink !== "#" ? (
+                                                                                <Link
+                                                                                    to={child.navlink}
+                                                                                    className="child-nav-link"
+                                                                                    onClick={(e) => handleNavClick(e, child.navlink)}
+                                                                                >
+                                                                                    {child.name}
+                                                                                </Link>
+                                                                            ) : (
+                                                                                <Nav.Link
+                                                                                    href={child.to || child.navlink || "#"}
+                                                                                    className="child-nav-link"
+                                                                                >
+                                                                                    {child.name}
+                                                                                </Nav.Link>
+                                                                            )}
                                                                         </li>
                                                                     ))}
                                                                 </ul>
@@ -202,10 +211,9 @@ const HeaderMenu: React.FC = () => {
                         </Navbar.Offcanvas>
                     </Container>
                 </Navbar>
-
             </div>
         </>
     );
 };
 
-export default HeaderMenu; 
+export default HeaderMenu;

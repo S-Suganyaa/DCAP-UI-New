@@ -1,7 +1,6 @@
 import { createContext, useEffect, useState, type ReactNode } from "react";
 import { useMsal } from "@azure/msal-react";
-import { loginRequest } from "../auth/Authconfig";
-import httpClient from "../api/httpClient";
+import { InteractionStatus } from "@azure/msal-browser";
 import { type User } from "../types/auth";
 
 interface AuthContextType {
@@ -14,38 +13,49 @@ export const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
+// Define loginRequest with scopes
+const loginRequest = {
+  scopes: ["openid", "profile", "email"],
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const { instance, accounts } = useMsal();
+  const { instance, accounts, inProgress } = useMsal();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        let account = accounts[0];
-
-        // If no account, trigger login
-        if (!account) {
-          const loginResponse = await instance.loginPopup(loginRequest);
-          account = loginResponse.account;
+        // Wait for MSAL to finish initializing
+        if (inProgress !== InteractionStatus.None) {
+          return;
         }
 
-        // Acquire access token silently
-        const tokenResponse = await instance.acquireTokenSilent({
-          ...loginRequest,
-          account: account!,
-        });
+        // If user is already logged in, get token
+        if (accounts.length > 0) {
+          const account = accounts[0];
+          
+          try {
+            const tokenResponse = await instance.acquireTokenSilent({
+              ...loginRequest,
+              account: account,
+            });
 
-        // Call API with access token
-        const res = await httpClient.get<User>("/auth/me", {
-          headers: {
-            Authorization: `Bearer ${tokenResponse.accessToken}`,
-          },
-        });
-
-        setUser(res.data);
+            if (tokenResponse.accessToken) {
+              localStorage.setItem("token", tokenResponse.accessToken);
+              localStorage.setItem("user", JSON.stringify(account));
+              setUser(account as any);
+            }
+          } catch (tokenError) {
+            console.error("Token acquisition error:", tokenError);
+            setUser(null);
+          }
+        } else {
+          // No account - user is not logged in
+          setUser(null);
+        }
       } catch (err) {
-        console.error("Failed to login or fetch user:", err);
+        console.error("Failed to fetch user:", err);
         setUser(null);
       } finally {
         setLoading(false);
@@ -53,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchUser();
-  }, [accounts, instance]);
+  }, [accounts, instance, inProgress]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>

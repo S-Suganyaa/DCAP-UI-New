@@ -1,19 +1,13 @@
 import { useMsal } from "@azure/msal-react";
-import { loginRequest } from "./auth/Authconfig";
-import './App.css'
 import  "bootstrap/dist/css/bootstrap.min.css";
+import './App.css';
  
 
 import AppRoutes from "./routes/Approutes";
 
 function App() {
   const { instance, accounts } = useMsal();
-
-  const   handleLogin = async () => {
-    instance.loginPopup(loginRequest).catch((e) => {
-      console.error(e);
-    });
-  };
+  
 
   const handleLogout = async () => {
     instance.logoutPopup().catch((e) => {
