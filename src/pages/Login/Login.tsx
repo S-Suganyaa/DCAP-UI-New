@@ -66,11 +66,6 @@ const isCorpUser = (email: string): boolean => {
   return email.toLowerCase().endsWith("@eagle.org");
 };
 
-// NEXT button - Redirect to Microsoft login page
-// ... existing code ...
-
-// NEXT button - Redirect to Microsoft login page or navigate to Project
-// ... existing code ...
 
 // NEXT button - Navigate to Project page after email validation
 const handleNext = async () => {
@@ -95,11 +90,6 @@ const handleNext = async () => {
     navigate("/app/Project", { replace: true });
   }
 };
-
-// ... existing code ...
-
-
-// ... existing code ...
 
 const handleLogin = async () => {
   if (!password) {
