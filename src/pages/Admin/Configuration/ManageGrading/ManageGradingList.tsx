@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BreadcrumbBar, Button, AbsReactTable, BUTTONS, AbsSearch, CheckboxInput } from "customer_portal-ui-shared";
 import * as Icon from 'react-bootstrap-icons';
-import { useNavigate } from 'react-router-dom';
 import ManageGradingTemplateList from './ManageGradingTemplateList';
 import * as gradingService from '../../../../service/GradingService';
 
@@ -19,17 +18,20 @@ interface ManageGradingRow {
 }
 
 const ManageGradingList: React.FC = () => {
-    const navigate = useNavigate();
     const [val, updateVal] = useState<string>("");
     const [searchApplied, updateSearchApplied] = useState<string | null>(null);
     const [gradings, setGradings] = useState<ManageGradingRow[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [filters, setFilters] = useState<any>(null);
-    const [finaldata, setFinalData] = useState<any[]>([]);
+    const [, setFinalData] = useState<any[]>([]);
     const [dataCount, setDataCount] = useState(0);
-    const [GradingFilter, setGradingFilter] = useState([]);
-    const [searchText, setSearchText] = useState<string>("");
-    const [searchApply, setSearchApply] = useState<string | null>(null);
+    const [GradingFilter, setGradingFilter] = useState<ManageGradingRow[]>([]);
+    const [hierarchicalFilters, setHierarchicalFilters] = useState<{
+        vesselType?: string;
+        templateName?: string;
+        sectionName?: string;
+    }>({});
+
     const initialFilterState = {
         searchType: "list",
         resetPageIndex: false,
@@ -62,172 +64,210 @@ const ManageGradingList: React.FC = () => {
                 .toLowerCase()
             : "";
 
-    const searchVessels = (filters: any, searchType: string, pageIndex: number, pageSize: any) => {
-
+    // Fixed searchVessels to handle search text and pagination correctly
+    const searchVessels = useCallback((filters: any, searchType: string, pageIndex: number, pageSize: any, searchText?: string | null) => {
         let searchVessels: any = [];
-
         const filterEntries = Object.entries(filters?.filters || {});
 
-        if (appliedFilters.pageSize !== pageSize) {
+        // Convert pageSize and pageIndex to numbers
+        const pageSizeNum = typeof pageSize === 'string' ? parseInt(pageSize, 10) : Number(pageSize);
+        const pageIndexNum = typeof pageIndex === 'string' ? parseInt(pageIndex, 10) : Number(pageIndex);
 
-            setAppliedFilters({ ...filters, resetPageIndex: true });
+        // Use searchText parameter or fallback to searchApplied state
+        const currentSearchText = searchText !== undefined ? searchText : searchApplied;
+
+        // Filter data based on hierarchical filters and search text
+        let dataToPaginate = GradingFilter;
+
+        // Apply hierarchical filters (vesselType, templateName, sectionName)
+        if (hierarchicalFilters.vesselType) {
+            dataToPaginate = dataToPaginate.filter(item => 
+                item.vesselType === hierarchicalFilters.vesselType
+            );
+        }
+        if (hierarchicalFilters.templateName) {
+            dataToPaginate = dataToPaginate.filter(item => 
+                item.templateName === hierarchicalFilters.templateName
+            );
+        }
+        if (hierarchicalFilters.sectionName) {
+            dataToPaginate = dataToPaginate.filter(item => 
+                item.sectionName === hierarchicalFilters.sectionName
+            );
+        }
+
+        // Apply search text filter (templateName and sectionName)
+        if (currentSearchText) {
+            dataToPaginate = dataToPaginate.filter((item) => {
+                const searchLower = currentSearchText.toLowerCase();
+                return (
+                    item.templateName?.toLowerCase().includes(searchLower) ||
+                    item.sectionName?.toLowerCase().includes(searchLower) ||
+                    item.gradingName?.toLowerCase().includes(searchLower) ||
+                    item.vesselType?.toLowerCase().includes(searchLower)
+                );
+            });
         }
 
         if (searchType === "list") {
-            searchVessels = finaldata.slice(
-                pageIndex * pageSize,
-                pageSize * (pageIndex + 1)
-            );
-            setDataCount(finaldata.length)
+            // Calculate slice indices correctly - ensure pageIndex is 0-based
+            const startIndex = pageIndexNum * pageSizeNum;
+            const endIndex = startIndex + pageSizeNum;
+
+            console.log(`Pagination: pageIndex=${pageIndexNum}, pageSize=${pageSizeNum}, start=${startIndex}, end=${endIndex}, total=${dataToPaginate.length}`);
+
+            searchVessels = dataToPaginate.slice(startIndex, endIndex);
+            setDataCount(dataToPaginate.length); // Set total count for filtered data
         } else if (searchType === "all") {
-            searchVessels = finaldata
-                .filter((vessel) =>
-                    filterEntries.every(([columnId, filter]) => {
-                        const { searchTerm } = filter as { searchTerm: string };
-                        if (!searchTerm) return true;
-
-                        const vesselValue = cleanString(vessel[columnId]);
-                        const normalizedSearchTerm = cleanString(searchTerm);
-
-                        return vesselValue.includes(normalizedSearchTerm);
-                    })
-                )
-                .slice(pageIndex * pageSize, pageSize * (pageIndex + 1));
-
-            const count = finaldata.filter((vessel) =>
+            const filteredData = dataToPaginate.filter((vessel) =>
                 filterEntries.every(([columnId, filter]) => {
                     const { searchTerm } = filter as { searchTerm: string };
                     if (!searchTerm) return true;
 
-                    const vesselValue = cleanString(vessel[columnId]);
+                    const vesselValue = cleanString((vessel as any)[columnId] || '');
                     const normalizedSearchTerm = cleanString(searchTerm);
 
                     return vesselValue.includes(normalizedSearchTerm);
                 })
-            ).length;
+            );
 
+            const startIndex = pageIndexNum * pageSizeNum;
+            const endIndex = startIndex + pageSizeNum;
 
-            setDataCount(count);
-
+            searchVessels = filteredData.slice(startIndex, endIndex);
+            setDataCount(filteredData.length);
         }
-        setGradings([...searchVessels]);
-    };
 
+        // REPLACE data, don't append
+        setGradings(searchVessels);
+    }, [GradingFilter, searchApplied, hierarchicalFilters]);
 
     const applyFilter = useCallback(
         (filtersObj: any) => {
-
             const filteredData = Object.fromEntries(
-                Object.entries(filtersObj.filters).filter(
-                    ([key, value]) => (value as { searchTerm: string }).searchTerm !== ""
+                Object.entries(filtersObj.filters || {}).filter(
+                    ([, value]) => (value as { searchTerm: string })?.searchTerm !== ""
                 )
             );
 
             const {
-                filters = {},
                 pageIndex: newPageIndex,
                 pageSize: newPageSize,
                 searchType: newSearchType,
             } = filtersObj;
-            let updatedFilters = {
-                ...filtersObj,
-                filters: { ...filteredData },
-                sort: filtersObj.sort,
-            };
-            if (appliedFilters.searchType !== newSearchType && newSearchType === 'list') {
-                updatedFilters = {
-                    ...updatedFilters,
-                    filters: {},
-                }
-            }
-            if (
-                appliedFilters.searchType !== newSearchType ||
-                appliedFilters.searchType === "all" ||
-                appliedFilters.pageSize !== newPageSize ||
-                appliedFilters.pageIndex !== newPageIndex ||
-                appliedFilters.resetFilters
-            ) {
-                setLoading(true);
-                setTimeout(() => {
-                    const pageIndexAll = newSearchType === "all" ? 0 : updatedFilters.pageIndex;
-                    searchVessels(
-                        { ...updatedFilters, pageIndex: pageIndexAll },
-                        newSearchType,
-                        pageIndexAll,
-                        newPageSize
-                    );
 
-                    setLoading(false);
-                }, 500);
-            }
-            setAppliedFilters(updatedFilters);
+            // Ensure pageIndex is a number
+            const pageIndexNum = typeof newPageIndex === 'string'
+                ? parseInt(newPageIndex, 10)
+                : Number(newPageIndex) || 0;
+
+            // Convert pageSize to number
+            const pageSizeNum = typeof newPageSize === 'string'
+                ? parseInt(newPageSize, 10)
+                : Number(newPageSize) || 20;
+
+            // Update state and call searchVessels immediately
+            setAppliedFilters(() => {
+                const updatedFilters = {
+                    ...filtersObj,
+                    pageIndex: pageIndexNum,
+                    filters: filteredData,
+                    sort: filtersObj.sort,
+                    searchType: newSearchType,
+                    pageSize: newPageSize,
+                    resetPageIndex: false,
+                };
+
+                // Call searchVessels immediately with correct parameters
+                const pageIndexAll = newSearchType === "all" ? 0 : pageIndexNum;
+
+                searchVessels(
+                    { ...updatedFilters, pageIndex: pageIndexAll, filters: filteredData },
+                    newSearchType,
+                    pageIndexAll,
+                    pageSizeNum
+                );
+
+                return updatedFilters;
+            });
         },
-        [appliedFilters, finaldata]
+        [searchVessels]
     );
 
-    const onChangeSearchInput = (value: string) => {
+    const onChangeSearchInput = useCallback((value: string) => {
         updateVal(value);
-        setLoading(true);
-        if (value) {
-            var filter = GradingFilter.filter((x: ManageGradingRow) =>
-                x.templateName.toLowerCase().includes(value.toLowerCase()));
-            setGradings(filter);
-            setFinalData(filter);
-            setDataCount(filter.length);
 
+        if (value.trim() === "") {
+            // Clear search - show all data and reset to first page
+            updateSearchApplied(null);
+            if (GradingFilter && GradingFilter.length > 0) {
+                const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != ""
+                    ? (typeof appliedFilters.pageSize === 'string' ? parseInt(appliedFilters.pageSize, 10) : Number(appliedFilters.pageSize))
+                    : 20;
+                // Reset pagination to first page
+                setAppliedFilters(prev => ({
+                    ...prev,
+                    pageIndex: 0,
+                    resetPageIndex: true
+                }));
+                searchVessels({}, "list", 0, pagesize, null);
+                // Update dataCount to total records
+                setDataCount(GradingFilter.length);
+            }
         } else {
-            var filter = GradingFilter.filter((x: ManageGradingRow) =>
-                x.templateName.toLowerCase().includes(value.toLowerCase()));
-            setGradings(filter);
-            setFinalData(filter);
-            setDataCount(filter.length);
-
+            // Apply search filter in real-time
+            updateSearchApplied(value);
+            if (GradingFilter && GradingFilter.length > 0) {
+                const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != ""
+                    ? (typeof appliedFilters.pageSize === 'string' ? parseInt(appliedFilters.pageSize, 10) : Number(appliedFilters.pageSize))
+                    : 20;
+                // Reset to first page when search changes
+                setAppliedFilters(prev => ({
+                    ...prev,
+                    pageIndex: 0,
+                    resetPageIndex: true
+                }));
+                searchVessels({}, "list", 0, pagesize, value);
+            }
         }
-    };
+    }, [GradingFilter, appliedFilters.pageSize, searchVessels]);
 
     useEffect(() => {
-        if (loading) {
-            setLoading(false);
-            const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != "" ? appliedFilters.pageSize : 5;
-            searchVessels({}, "list", 0, pagesize);
-            applyFilter({
-                ...appliedFilters, pageIndex: 0, resetPageIndex: true
-            })
+        if (GradingFilter && GradingFilter.length > 0) {
+            if (gradings.length === 0) {
+                const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != ""
+                    ? (typeof appliedFilters.pageSize === 'string' ? parseInt(appliedFilters.pageSize, 10) : Number(appliedFilters.pageSize))
+                    : 20;
+                
+                searchVessels({}, "list", 0, pagesize);
+                setDataCount(GradingFilter.length);
+            }
         }
-    }, [finaldata]);
+    }, [GradingFilter]);
 
     const loadGradings = async () => {
         try {
             setLoading(true);
 
-
             const res = await gradingService.getGradings();
 
+            console.log(res.data, "GradingList");
+
+            // Handle response data
+            let dataArray: ManageGradingRow[] = [];
+            if (Array.isArray(res.data)) {
+                dataArray = res.data;
+            } else if (res.data?.data && Array.isArray(res.data.data)) {
+                dataArray = res.data.data;
+            } else if (res.data?.Data && Array.isArray(res.data.Data)) {
+                dataArray = res.data.Data;
+            }
             setGradings(res.data);
-            setGradingFilter(res.data);
-            setFinalData(res.data);
-            setDataCount(res.data.length);
-            sessionStorage.setItem("GradingList", JSON.stringify(res.data));
+            setGradingFilter(dataArray);
+            setFinalData(dataArray);
+            setDataCount(dataArray.length);
 
-            //if (response.data) {
-            //    console.log(response.data, "response.data");
-
-            //    // Handle both array response and DataSourceResult response
-            //    let dataArray: ManageGradingRow[] = [];
-            //    if (Array.isArray(response.data)) {
-            //        dataArray = response.data;
-            //    } else if (response.data.data && Array.isArray(response.data.data)) {
-            //        dataArray = response.data.data;
-            //    } else if (response.data.Data && Array.isArray(response.data.Data)) {
-            //        dataArray = response.data.Data;
-            //    }
-
-            //    // Set finaldata with ALL records (like AssociatedAnomalies)
-            //    setFinalData(dataArray);
-
-            //    // Set data count to total length (like AssociatedAnomalies)
-            //    setDataCount(dataArray.length);
-            //}
+            sessionStorage.setItem("GradingList", JSON.stringify(dataArray));
         } catch (error) {
             console.error("Error loading gradings:", error);
         } finally {
@@ -287,11 +327,10 @@ const ManageGradingList: React.FC = () => {
                     // Reload data after deletion
                     loadGradings();
                 } else {
-                    alert("Grading deletion failed, Please try again later..!");
+                   
                 }
             } catch (error) {
                 console.error("Error deleting grading:", error);
-                alert("Grading deletion failed, Please try again later..!");
             } finally {
                 setLoading(false);
             }
@@ -328,16 +367,15 @@ const ManageGradingList: React.FC = () => {
                 label: "Status",
                 accessorKey: "isActive",
                 accessor: "isActive",
-                cell: (info: { getValue: () => any }) => {
-                    const isActive = info.getValue();
-                    return isActive ? 'Active' : 'InActive';
+                Cell: ({ cell: { value } }: { cell: { value: any } }) => {
+                    return <span>{value ? 'Active' : 'Inactive'}</span>;
                 },
             },
             {
                 label: "Required in Export",
                 accessorKey: "requiredInReport",
                 accessor: "requiredInReport",
-                Cell: ({ row: { original = {} }, cell: { value } }: { row: { original: ManageGradingRow }, cell: { value: any } }) => {
+                Cell: ({ cell: { value } }: { cell: { value: any } }) => {
                     return (
                         <div className='d-flex justify-content-center gap-3'>
                             <CheckboxInput
@@ -355,22 +393,22 @@ const ManageGradingList: React.FC = () => {
                 accessorKey: "action",
                 accessor: "action",
                 filter: false,
-                Cell: ({ row: { original = {} } }: { row: { original: ManageGradingRow } }) => {
-                    return (
-                        <div className='d-flex justify-content-start gap-3'>
-                            <Button
-                                variant={BUTTONS.TABLEDOWNLOAD}
-                                startIcon={<Icon.PencilFill />}
-                                onClick={() => handleEditGrading(original)}
-                            />
-                            <Button
-                                variant={BUTTONS.TABLEDOWNLOAD}
-                                startIcon={<Icon.TrashFill />}
-                                onClick={() => handleDeleteGrading(original)}
-                            />
-                        </div>
-                    );
-                }
+            Cell: ({ row }: { row: { original: ManageGradingRow } }) => {
+                return (
+                    <div className='d-flex justify-content-start gap-3'>
+                        <Button
+                            variant={BUTTONS.TABLEDOWNLOAD}
+                            startIcon={<Icon.PencilFill />}
+                            onClick={() => handleEditGrading(row.original)}
+                        />
+                        <Button
+                            variant={BUTTONS.TABLEDOWNLOAD}
+                            startIcon={<Icon.TrashFill />}
+                            onClick={() => handleDeleteGrading(row.original)}
+                        />
+                    </div>
+                );
+            }
             },
         ],
         []
@@ -380,6 +418,7 @@ const ManageGradingList: React.FC = () => {
         updateVal("");
         updateSearchApplied(null);
         setFilters(null);
+        setHierarchicalFilters({}); // Clear hierarchical filters
         localStorage.removeItem("SearchGradingFilter");
         localStorage.removeItem("GradingFilter");
 
@@ -390,17 +429,30 @@ const ManageGradingList: React.FC = () => {
             resetPageIndex: true
         }));
 
-        if (finaldata && finaldata.length > 0) {
+        if (GradingFilter && GradingFilter.length > 0) {
             const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != ""
                 ? (typeof appliedFilters.pageSize === 'string' ? parseInt(appliedFilters.pageSize, 10) : Number(appliedFilters.pageSize))
                 : 20;
-            // Reset to first page with all data (no search filter)
+            // Show first page with all data (no search filter)
             searchVessels({}, "list", 0, pagesize, null);
             // Update dataCount to total records
-            setDataCount(finaldata.length);
+            setDataCount(GradingFilter.length);
         }
     };
 
+    const handleHierarchicalFilterChange = useCallback((filters: { 
+        vesselType?: string; 
+        templateName?: string; 
+        sectionName?: string 
+    }) => {
+        setHierarchicalFilters(filters);
+        // Reset pagination when filter changes
+        setAppliedFilters(prev => ({
+            ...prev,
+            pageIndex: 0,
+            resetPageIndex: true
+        }));
+    }, []);
 
     return (
         <>
@@ -419,7 +471,11 @@ const ManageGradingList: React.FC = () => {
             <div className="page-content">
                 <div className="grid-container">
                     <div className="grid-sidebar">
-                        <ManageGradingTemplateList />
+                        <ManageGradingTemplateList 
+                            data={GradingFilter}
+                            onFilterChange={handleHierarchicalFilterChange}
+                            selectedFilters={hierarchicalFilters}
+                        />
                     </div>
                     <div className="grid-content-body">
                         <div className="row">
@@ -430,15 +486,7 @@ const ManageGradingList: React.FC = () => {
                                 <div className="d-flex justify-content-start align-items-center gap-2">
                                     <AbsSearch
                                         handleClear={() => {
-                                            onChangeSearchInput("");
-                                            setAppliedFilters((prev) => ({
-                                                ...prev,
-                                                pageIndex: 0,
-                                                resetPageIndex: true,
-                                                searchType: "list",
-                                                filters: {},
-                                            }));
-                                            searchVessels({}, "list", 0, appliedFilters.pageSize || 5);
+                                            handleClearFilter();
                                         }}
                                         value={val}
                                         handleChange={(e: any) => onChangeSearchInput(e.target.value)}
@@ -447,10 +495,8 @@ const ManageGradingList: React.FC = () => {
                                         }}
                                         placeholder="Search by Part Name, Section Name"
                                         searchApplied={searchApplied !== null}
-
                                     />
-                                    <a onClick={() => onChangeSearchInput("")} className="ml-3 text-nowrap text-underline" >Clear Filters</a>
-
+                                    <a onClick={() => handleClearFilter()} className="ml-3 text-nowrap text-underline">Clear Filters</a>
                                 </div>
                             </div>
                         </div>
@@ -465,15 +511,15 @@ const ManageGradingList: React.FC = () => {
                                     expand={false}
                                     allowColumnsShowHide={false}
                                     shadow={true}
-                                    dataCount={dataCount || finaldata.length}
+                                    dataCount={dataCount || GradingFilter.length}
+                                    applyFilterCallback={applyFilter}
                                     appliedFilters={{
                                         ...appliedFilters,
                                         pageSize: appliedFilters.pageSize.toString(),
+                                        pageIndex: appliedFilters.pageIndex.toString(),
                                     }}
                                     pageOptions={["20", "30", "40", "50"]}
-                                    pageIndex={appliedFilters.pageIndex}
-                                    pageSize={appliedFilters.pageSize.toString()}
-                                    allowColumnsShowHide={false}
+                                    allDataProvided
                                 />
                             )}
                         </div>
