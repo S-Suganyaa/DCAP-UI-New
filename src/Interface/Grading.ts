@@ -45,3 +45,18 @@ export interface ManageGradingRow {
     isActive: boolean;
     requiredInReport: boolean;
 }
+
+// Form data interface for Create/Edit Grading
+export interface GradingFormData {
+    id?: number;
+    gradingId?: number;
+    tanktypeId?: number;
+    templateId?: number;
+    sectionId?: number;
+    vesselType: string;
+    templateName: string;
+    sectionName: string;
+    gradingName: string;
+    status: boolean; // isActive
+    requiredInReport: boolean;
+}
