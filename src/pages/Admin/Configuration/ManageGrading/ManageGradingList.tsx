@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { BreadcrumbBar, Button, AbsReactTable, BUTTONS, AbsSearch, CheckboxInput } from "customer_portal-ui-shared";
+import { BreadcrumbBar, Button, AbsReactTable, BUTTONS, Divider, Input, AbsSelect, AbsSearch, CheckboxInput, RadioInput, Label } from "customer_portal-ui-shared";
 import * as Icon from 'react-bootstrap-icons';
 import ManageGradingTemplateList from './ManageGradingTemplateList';
+import { Modal, Offcanvas } from 'react-bootstrap';
 import * as gradingService from '../../../../service/GradingService';
 
-// Define interface locally if Interface/Grading.ts doesn't exist
 interface ManageGradingRow {
     gradingId: number;
     sectionId: number;
@@ -16,14 +16,32 @@ interface ManageGradingRow {
     isActive: boolean;
     requiredInReport: boolean;
 }
+// Around line 19
+type FormData = {
+    vesselValue: number | null;
+    vesselText: string;
 
+    partValue: number | null;
+    partText: string;
+
+    sectionValue: string | number;  // Allow GUID (string) or number
+    sectionText: string;
+
+    grading_name: string;
+};
+
+// Around line 32
+type SelectOption = {
+    text: string;
+    value: number | string;  // Allow both number and string (for GUID)
+};
 const ManageGradingList: React.FC = () => {
-    const [val, updateVal] = useState<string>("");
-    const [searchApplied, updateSearchApplied] = useState<string | null>(null);
+    const [val, updateVal] = React.useState<string>("");
+    const [searchApplied, updateSearchApplied] = React.useState<string | null>(null);
     const [gradings, setGradings] = useState<ManageGradingRow[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [filters, setFilters] = useState<any>(null);
-    const [, setFinalData] = useState<any[]>([]);
+    const [FinalData, setFinalData] = useState<any[]>([]);
     const [dataCount, setDataCount] = useState(0);
     const [GradingFilter, setGradingFilter] = useState<ManageGradingRow[]>([]);
     const [hierarchicalFilters, setHierarchicalFilters] = useState<{
@@ -31,6 +49,19 @@ const ManageGradingList: React.FC = () => {
         templateName?: string;
         sectionName?: string;
     }>({});
+    const [checked, setChecked] = React.useState<boolean>();
+    const [open, setOpen] = React.useState<boolean>();
+    const [deleteModel, setDeleteModel] = React.useState<boolean>();
+    const [selected, setSelected] = React.useState<number | undefined>();
+    const [formData, setFormData] = useState<FormData>({
+        vesselValue: null,
+        vesselText: "",
+        partValue: null,
+        partText: "",
+        sectionValue: "",
+        sectionText: "",
+        grading_name: ""
+    });
 
     const initialFilterState = {
         searchType: "list",
@@ -47,11 +78,91 @@ const ManageGradingList: React.FC = () => {
     const [appliedFilters, setAppliedFilters] = React.useState({
         ...initialFilterState,
     });
+    const [vesselOptions, setVesselOptions] = useState<SelectOption[]>([]);
+    const [partOptions, setPartOptions] = useState<SelectOption[]>([]);
+    const [sectionOptions, setSectionOptions] = useState<SelectOption[]>([]);
+    const [selectedVesselType, setselectedVesselType] = useState("");
+    const [GradingName, setGradingName] = useState("");
+    const [activationStatus, setActivationStatus] = useState<boolean | null>(null);
+    const [reportStatus, setReportStatus] = useState<boolean | null>(null);
 
     useEffect(() => {
         loadGradings();
         restoreFilters();
     }, []);
+
+    // Around line 96 - Fix the vesselOptions mapping
+    useEffect(() => {
+        gradingService.getVesselType().then(res => {
+            setVesselOptions(
+                res.data.data.map((v: any) => ({
+                    text: v.vesselType,
+                    value: v.id  // Use lowercase 'id' as per API response
+                }))
+            );
+        });
+    }, []);
+
+
+    const onVesselChange = (vesselType: string) => {
+        console.log("Selected vesselType:", vesselType);
+        setselectedVesselType(vesselType);
+        gradingService.getTemplateName(vesselType).then(res => {
+            console.log("Template API:", res.data);
+
+            setPartOptions(
+                res.data.data.map((p: any) => ({
+                    text: p.templateName, // PascalCase
+                    value: p.templateId   // number
+                }))
+            );
+        });
+    };
+
+
+
+    const onTemplateChange = (templateId: number) => {
+        if (!templateId || !selectedVesselType) return;
+
+        gradingService
+            .getSectionName(templateId, selectedVesselType)
+            .then(res => {
+
+                console.log(res.data.data, "sectionname");
+
+                setSectionOptions(
+                    res.data.data.map((s: any) => ({
+                        text: s.sectionName,
+                        value: s.sectionId
+                    }))
+                );
+            })
+            .catch(err => {
+                setSectionOptions([]);
+            });
+    };
+
+
+    const handleCreate = async () => {
+
+        var formdata = {
+            vesselType: formData.vesselText,
+            templateName: formData.partText,
+            sectionName: formData.sectionText,
+            gradingName: GradingName,
+            status: activationStatus === true,
+            requiredInReport: reportStatus === true,
+        };
+
+        await gradingService.createGrading(formdata).then(res => {
+
+        });
+
+        setOpen(false);
+       // loadGradings();
+    };
+
+
 
     const cleanString = (str: string) =>
         str
@@ -81,17 +192,17 @@ const ManageGradingList: React.FC = () => {
 
         // Apply hierarchical filters (vesselType, templateName, sectionName)
         if (hierarchicalFilters.vesselType) {
-            dataToPaginate = dataToPaginate.filter(item => 
+            dataToPaginate = dataToPaginate.filter(item =>
                 item.vesselType === hierarchicalFilters.vesselType
             );
         }
         if (hierarchicalFilters.templateName) {
-            dataToPaginate = dataToPaginate.filter(item => 
+            dataToPaginate = dataToPaginate.filter(item =>
                 item.templateName === hierarchicalFilters.templateName
             );
         }
         if (hierarchicalFilters.sectionName) {
-            dataToPaginate = dataToPaginate.filter(item => 
+            dataToPaginate = dataToPaginate.filter(item =>
                 item.sectionName === hierarchicalFilters.sectionName
             );
         }
@@ -113,8 +224,6 @@ const ManageGradingList: React.FC = () => {
             // Calculate slice indices correctly - ensure pageIndex is 0-based
             const startIndex = pageIndexNum * pageSizeNum;
             const endIndex = startIndex + pageSizeNum;
-
-            console.log(`Pagination: pageIndex=${pageIndexNum}, pageSize=${pageSizeNum}, start=${startIndex}, end=${endIndex}, total=${dataToPaginate.length}`);
 
             searchVessels = dataToPaginate.slice(startIndex, endIndex);
             setDataCount(dataToPaginate.length); // Set total count for filtered data
@@ -238,7 +347,7 @@ const ManageGradingList: React.FC = () => {
                 const pagesize = appliedFilters.pageSize != null && appliedFilters.pageSize != ""
                     ? (typeof appliedFilters.pageSize === 'string' ? parseInt(appliedFilters.pageSize, 10) : Number(appliedFilters.pageSize))
                     : 20;
-                
+
                 searchVessels({}, "list", 0, pagesize);
                 setDataCount(GradingFilter.length);
             }
@@ -327,7 +436,7 @@ const ManageGradingList: React.FC = () => {
                     // Reload data after deletion
                     loadGradings();
                 } else {
-                   
+
                 }
             } catch (error) {
                 console.error("Error deleting grading:", error);
@@ -336,7 +445,6 @@ const ManageGradingList: React.FC = () => {
             }
         }
     };
-
     const columns = useMemo<Array<any>>(
         () => [
             {
@@ -393,22 +501,14 @@ const ManageGradingList: React.FC = () => {
                 accessorKey: "action",
                 accessor: "action",
                 filter: false,
-            Cell: ({ row }: { row: { original: ManageGradingRow } }) => {
-                return (
-                    <div className='d-flex justify-content-start gap-3'>
-                        <Button
-                            variant={BUTTONS.TABLEDOWNLOAD}
-                            startIcon={<Icon.PencilFill />}
-                            onClick={() => handleEditGrading(row.original)}
-                        />
-                        <Button
-                            variant={BUTTONS.TABLEDOWNLOAD}
-                            startIcon={<Icon.TrashFill />}
-                            onClick={() => handleDeleteGrading(row.original)}
-                        />
-                    </div>
-                );
-            }
+                Cell: ({ row }: { row: { original: ManageGradingRow } }) => {
+                    return (
+                        <div className='d-flex justify-content-start gap-3'>
+                            <Button variant={BUTTONS.TABLEDOWNLOAD} startIcon={<Icon.PencilFill />}></Button>
+                            <Button variant={BUTTONS.TABLEDOWNLOAD} onClick={() => (setDeleteModel(true))} startIcon={<Icon.TrashFill />}></Button>
+                        </div>
+                    );
+                }
             },
         ],
         []
@@ -440,10 +540,10 @@ const ManageGradingList: React.FC = () => {
         }
     };
 
-    const handleHierarchicalFilterChange = useCallback((filters: { 
-        vesselType?: string; 
-        templateName?: string; 
-        sectionName?: string 
+    const handleHierarchicalFilterChange = useCallback((filters: {
+        vesselType?: string;
+        templateName?: string;
+        sectionName?: string
     }) => {
         setHierarchicalFilters(filters);
         // Reset pagination when filter changes
@@ -465,13 +565,13 @@ const ManageGradingList: React.FC = () => {
                             link: ""
                         }
                     ]}>
-                    <Button>Add New Grading</Button>
+                    <Button onClick={() => (setOpen(true))}>Add New Grading</Button>
                 </BreadcrumbBar>
             </div>
             <div className="page-content">
                 <div className="grid-container">
                     <div className="grid-sidebar">
-                        <ManageGradingTemplateList 
+                        <ManageGradingTemplateList
                             data={GradingFilter}
                             onFilterChange={handleHierarchicalFilterChange}
                             selectedFilters={hierarchicalFilters}
@@ -480,7 +580,7 @@ const ManageGradingList: React.FC = () => {
                     <div className="grid-content-body">
                         <div className="row">
                             <div className="col-md-8">
-                                <h5 className='_600'>Bulk Carrier - Grading</h5>
+                                <h5 className='_600'>  Bulk Carrier - Grading</h5>
                             </div>
                             <div className="col-md-6 mb-3 mt-2">
                                 <div className="d-flex justify-content-start align-items-center gap-2">
@@ -526,6 +626,188 @@ const ManageGradingList: React.FC = () => {
                     </div>
                 </div>
             </div>
+            <Offcanvas show={open} placement={"end"} onHide={() => setOpen(false)} backdrop="static">
+                <Offcanvas.Header closeButton>
+                    <Offcanvas.Title>Add New ABS Grading</Offcanvas.Title>
+                </Offcanvas.Header>
+                <Offcanvas.Body>
+                    <div className="row">
+                        <div className="col-md-12 form-group">
+                            <Label name="Vessel Template " bold />
+                            <AbsSelect
+                                mult={false}
+                                options={vesselOptions}
+                                selected={formData.vesselValue ? [formData.vesselValue] : []}
+                                // Vessel Template Select - around line 639
+                                onChange={(selected: any[]) => {
+                                    const selectedValue = selected?.[0]; // This is the VALUE (number: 1, 2, 3, etc.)
+                                    if (!selectedValue) return;
+
+                                    // Find the option object from vesselOptions by matching VALUE (not text)
+                                    const opt = vesselOptions.find(option => option.value === selectedValue);
+                                    if (!opt) return;
+
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        vesselValue: opt.value, // NUMBER (Id: 1, 2, 3, etc.)
+                                        vesselText: opt.text,    // STRING (vessel type name: "Bulk Carrier", etc.)
+                                        partValue: null,
+                                        partText: "",
+                                        sectionValue: "",
+                                        sectionText: ""
+                                    }));
+
+                                    setPartOptions([]);
+                                    setSectionOptions([]);
+
+                                    onVesselChange(opt.text); // Pass vessel type string
+                                }}
+                                placeholder="Select Vessel Template"
+                            />
+
+                        </div>
+                        <div className="col-md-12 form-group">
+                            <Label name="Part Name" bold />
+                            <AbsSelect
+                                mult={false}
+                                options={partOptions}
+                                selected={formData.partValue ? [formData.partValue] : []}
+                                onChange={(selected: any[]) => {
+                                    const selectedValue = selected?.[0]; // This is the VALUE (number: templateId)
+                                    if (!selectedValue) return;
+
+                                    // Find the option object from partOptions by matching VALUE
+                                    const opt = partOptions.find(option => option.value === selectedValue);
+                                    if (!opt) return;
+
+                                    // Part Name Select - around line 683
+                                    // Part Name Select onChange - around line 683
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        partValue: Number(opt.value) as number,   // Cast to number explicitly
+                                        partText: opt.text,
+                                        sectionValue: "",
+                                        sectionText: ""
+                                    }));
+                                    setSectionOptions([]);
+                                    onTemplateChange(opt.value); // FIX: was 'opt', now 'opt.value' (number)
+                                }}
+                                placeholder="Select Part Name"
+                            />
+
+                        </div>
+                        <div className="col-md-12 form-group">
+                            <Label name="Section Name" bold />
+                            <AbsSelect
+                                mult={false}
+                                options={sectionOptions}
+                                selected={formData.sectionValue ? [formData.sectionValue] : []}
+                                onChange={(selected: any[]) => {
+                                    const selectedValue = selected?.[0]; // This is the VALUE (GUID string: sectionId)
+                                    if (!selectedValue) return;
+
+                                    // Find the option object from sectionOptions by matching VALUE
+                                    const opt = sectionOptions.find(option =>
+                                        String(option.value) === String(selectedValue)
+                                    );
+                                    if (!opt) return;
+
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        sectionValue: opt.value,  // GUID (sectionId)
+                                        sectionText: opt.text     // STRING (section name) - FIX: was 'opt', now 'opt.text'
+                                    }));
+                                }}
+                                placeholder="Select Section Name"
+                            />
+                        </div>
+
+                        <div className="col-md-12 form-group">
+                            <Label name="Grading Name" bold />
+                            <Input
+                                placeholder="Enter Description Name"
+                                value={GradingName}
+                                onChange={(value) => {
+                                    setGradingName(value);
+                                }}
+                            />
+                        </div>
+
+                        <div className="col-md-12 form-group">
+                            <Label name="Activation Status" bold />
+                            <div className='d-flex justify-contentn-start gap-3'>
+                                <RadioInput
+                                    label="Active"
+                                    checked={activationStatus === true}
+                                    onChange={() => setActivationStatus(true)}
+                                />
+
+                                <RadioInput
+                                    label="Inactive"
+                                    checked={activationStatus === false}
+                                    onChange={() => setActivationStatus(false)}
+                                />
+
+                            </div>
+                        </div>
+                        <div className="col-md-12 form-group">
+                            <Label name="Report Configuration" bold />
+                            <div className='d-flex justify-contentn-start gap-3'>
+                                <RadioInput
+                                    label="Required in Export"
+                                    checked={reportStatus === true}
+                                    onChange={() => setReportStatus(true)}
+                                />
+
+                                <RadioInput
+                                    label="Exclude in Export"
+                                    checked={reportStatus === false}
+                                    onChange={() => setReportStatus(false)}
+                                />
+
+                            </div>
+                        </div>
+                        <div className="col-md-12 form-group">
+                            <Divider className="divider-1" />
+                        </div>
+                        <div className="col-md-12 form-group">
+                            <div className="d-flex gap-2">
+                                <Button variant={BUTTONS.SECONDARY}>Cancel</Button>
+                                <Button variant={BUTTONS.PRIMARY} onClick={handleCreate}>Create</Button>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </Offcanvas.Body>
+            </Offcanvas>
+            <Modal show={deleteModel} size="lg" centered onHide={() => setDeleteModel(false)} animation={false} backdrop="static">
+                <Modal.Header closeButton>
+                    <Modal.Title>Delete Grading</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <div className="row">
+                        <div className="col-md-12">
+                            <div className="d-flex justify-content-center align-items-center flex-column">
+                                <div className="delete-icon-wrapper mb-4">
+                                    <Icon.Trash size={24} />
+                                </div>
+                                <p className='_500 tx-14'>
+                                    Are you sure you want to delete 'Mooring Winches with Foundations' Grading?
+
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </Modal.Body>                <Modal.Footer className='gap-3'>
+                    <Button variant={BUTTONS.SECONDARY} onClick={() => setDeleteModel(false)}>
+                        Cancel
+                    </Button>
+                    <Button variant={BUTTONS.PRIMARY} onClick={() => setDeleteModel(false)}>
+                        Save Changes
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </>
     );
 };
