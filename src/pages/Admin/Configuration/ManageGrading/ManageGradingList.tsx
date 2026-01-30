@@ -18,7 +18,7 @@ interface ManageGradingRow {
 }
 // Around line 19
 type FormData = {
-    vesselValue: number | null;
+    vesselValue: number | string | null;
     vesselText: string;
 
     partValue: number | null;
@@ -49,7 +49,7 @@ const ManageGradingList: React.FC = () => {
         templateName?: string;
         sectionName?: string;
     }>({});
-    const [checked, setChecked] = React.useState<boolean>();
+    const [error, setError] = React.useState<boolean>();
     const [open, setOpen] = React.useState<boolean>();
     const [deleteModel, setDeleteModel] = React.useState<boolean>();
     const [selected, setSelected] = React.useState<number | undefined>();
@@ -91,13 +91,12 @@ const ManageGradingList: React.FC = () => {
         restoreFilters();
     }, []);
 
-    // Around line 96 - Fix the vesselOptions mapping
     useEffect(() => {
         gradingService.getVesselType().then(res => {
             setVesselOptions(
                 res.data.data.map((v: any) => ({
                     text: v.vesselType,
-                    value: v.id  // Use lowercase 'id' as per API response
+                    value: v.id
                 }))
             );
         });
@@ -105,20 +104,18 @@ const ManageGradingList: React.FC = () => {
 
 
     const onVesselChange = (vesselType: string) => {
-        console.log("Selected vesselType:", vesselType);
+
         setselectedVesselType(vesselType);
         gradingService.getTemplateName(vesselType).then(res => {
-            console.log("Template API:", res.data);
 
             setPartOptions(
                 res.data.data.map((p: any) => ({
-                    text: p.templateName, // PascalCase
-                    value: p.templateId   // number
+                    text: p.templateName,
+                    value: p.templateId
                 }))
             );
         });
     };
-
 
 
     const onTemplateChange = (templateId: number) => {
@@ -127,8 +124,6 @@ const ManageGradingList: React.FC = () => {
         gradingService
             .getSectionName(templateId, selectedVesselType)
             .then(res => {
-
-                console.log(res.data.data, "sectionname");
 
                 setSectionOptions(
                     res.data.data.map((s: any) => ({
@@ -145,24 +140,55 @@ const ManageGradingList: React.FC = () => {
 
     const handleCreate = async () => {
 
-        var formdata = {
-            vesselType: formData.vesselText,
-            templateName: formData.partText,
-            sectionName: formData.sectionText,
-            gradingName: GradingName,
-            status: activationStatus === true,
-            requiredInReport: reportStatus === true,
-        };
+        // Validation
+        if (!formData.vesselText || !formData.partText || !formData.sectionText || !GradingName.trim()) {
+            setError(true);
+            return;
+        }
 
-        await gradingService.createGrading(formdata).then(res => {
+        //if (activationStatus === null) {
+        //    alert("Please select Activation Status");
+        //    return;
+        //}
 
-        });
+        //if (reportStatus === null) {
+        //    alert("Please select Report Configuration");
+        //    return;
+        //}
+        if (editingGradingId) {
+            var formdata = {
+                gradingId: editingGradingId,
+                vesselType: formData.vesselText,
+                templateName: formData.partText,
+                sectionName: formData.sectionText,
+                gradingName: GradingName,
+                status: activationStatus === true,
+                requiredInReport: reportStatus === true,
+            };
+
+            await gradingService.updateGrading(formdata).then(res => {
+                setOpen(false);
+                loadGradings();
+            });
+        } else {
+            var formdata = {
+                vesselType: formData.vesselText,
+                templateName: formData.partText,
+                sectionName: formData.sectionText,
+                gradingName: GradingName,
+                status: activationStatus === true,
+                requiredInReport: reportStatus === true,
+            };
+
+            await gradingService.createGrading(formdata).then(res => {
+                setOpen(false);
+                loadGradings();
+            });
+        }
 
         setOpen(false);
-       // loadGradings();
+
     };
-
-
 
     const cleanString = (str: string) =>
         str
@@ -175,7 +201,6 @@ const ManageGradingList: React.FC = () => {
                 .toLowerCase()
             : "";
 
-    // Fixed searchVessels to handle search text and pagination correctly
     const searchVessels = useCallback((filters: any, searchType: string, pageIndex: number, pageSize: any, searchText?: string | null) => {
         let searchVessels: any = [];
         const filterEntries = Object.entries(filters?.filters || {});
@@ -247,7 +272,6 @@ const ManageGradingList: React.FC = () => {
             setDataCount(filteredData.length);
         }
 
-        // REPLACE data, don't append
         setGradings(searchVessels);
     }, [GradingFilter, searchApplied, hierarchicalFilters]);
 
@@ -360,8 +384,6 @@ const ManageGradingList: React.FC = () => {
 
             const res = await gradingService.getGradings();
 
-            console.log(res.data, "GradingList");
-
             // Handle response data
             let dataArray: ManageGradingRow[] = [];
             if (Array.isArray(res.data)) {
@@ -378,7 +400,6 @@ const ManageGradingList: React.FC = () => {
 
             sessionStorage.setItem("GradingList", JSON.stringify(dataArray));
         } catch (error) {
-            console.error("Error loading gradings:", error);
         } finally {
             setLoading(false);
         }
@@ -418,32 +439,157 @@ const ManageGradingList: React.FC = () => {
         }
     };
 
-    const handleEditGrading = (row: ManageGradingRow) => {
-        saveFilters();
-        gradingService.navigateToEditGrading(
-            row.gradingId,
-            row.sectionId,
-            row.tanktypeId
-        );
+    const [editingGradingId, setEditingGradingId] = useState<number | null>(null);
+    const [editingSectionId, setEditingSectionId] = useState<number | null>(null);
+    const [editingTanktypeId, setEditingTanktypeId] = useState<number | null>(null);
+
+
+    const handleEditGrading = async (row: ManageGradingRow) => {
+        try {
+            setEditingGradingId(row.gradingId);
+            setEditingSectionId(row.sectionId);
+            setEditingTanktypeId(row.tanktypeId);
+
+            // Use data from row directly - bind specifically for display
+            // Since dropdowns will be disabled, we just need to ensure the Text matches the Value in the options provided
+
+            // Vessel - User confirmed ID is not saved, so we use the Text as the Value to ensure binding
+            const vesselVal = row.vesselType;
+
+            const vesselType = row.vesselType;
+
+            // Set vessel type
+            setselectedVesselType(vesselType);
+
+            setVesselOptions([{
+                text: row.vesselType,
+                value: vesselVal
+            }]);
+
+            // Part / Template
+            // Note: row might not have templateId, using -1 as placeholder since it's disabled anyway
+            const partVal = (row as any).templateId || -1;
+            setPartOptions([{
+                text: row.templateName,
+                value: partVal
+            }]);
+
+            // Section
+            const sectionVal = row.sectionId;
+            setSectionOptions([{
+                text: row.sectionName,
+                value: sectionVal
+            }]);
+
+            setFormData({
+                vesselText: row.vesselType,
+                vesselValue: vesselVal,
+                partText: row.templateName,
+                partValue: partVal, // Keep as is for part
+                sectionText: row.sectionName,
+                sectionValue: sectionVal,
+                grading_name: row.gradingName
+            });
+
+            setGradingName(row.gradingName || "");
+            setActivationStatus(row.isActive);
+            setReportStatus(row.requiredInReport);
+            setOpen(true);
+        } catch (error) { }
     };
 
-    const handleDeleteGrading = async (row: ManageGradingRow) => {
-        if (window.confirm(`Are you sure you want to delete '${row.gradingName}' Grading?`)) {
-            try {
-                setLoading(true);
-                const response = await gradingService.deleteGrading(row.gradingId, row.tanktypeId);
-                if (response.data) {
-                    // Reload data after deletion
-                    loadGradings();
-                } else {
+    //const handleCreate = async () => {
+    //    // Validation
+    //    if (!formData.vesselText || !formData.partText || !formData.sectionText || !GradingName.trim()) {
+    //        alert("Please fill in all required fields");
+    //        return;
+    //    }
 
-                }
-            } catch (error) {
-                console.error("Error deleting grading:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
+    //    if (activationStatus === null) {
+    //        alert("Please select Activation Status");
+    //        return;
+    //    }
+
+    //    if (reportStatus === null) {
+    //        alert("Please select Report Configuration");
+    //        return;
+    //    }
+
+    //    var formdata = {
+    //        vesselType: formData.vesselText,
+    //        templateName: formData.partText,
+    //        sectionName: formData.sectionText,
+    //        gradingName: GradingName.trim(),
+    //        status: activationStatus === true,
+    //        requiredInReport: reportStatus === true,
+    //    };
+
+    //    try {
+    //        if (editingGradingId) {
+
+    //            const res = await gradingService.updateGrading(editingGradingId, {
+    //                vesselType: formData.vesselText,
+    //                templateName: formData.partText,
+    //                sectionName: formData.sectionText,
+    //                gradingName: GradingName.trim(),
+    //                status: activationStatus === true,
+    //                requiredInReport: reportStatus === true,
+    //                gradingId: editingGradingId,
+    //                sectionId: editingSectionId || Number(formData.sectionValue),
+    //                tanktypeId: editingTanktypeId || 0,
+    //                templateId: formData.partValue || undefined,
+    //            });
+
+    //            if (res.data) {
+    //                alert("Grading updated successfully");
+    //                setOpen(false);
+    //                resetForm();
+    //                loadGradings();
+    //            }
+    //        } else {
+    //            // Create new grading
+    //            const res = await gradingService.createGrading(formdata);
+    //            if (res.data) {
+    //                alert("Grading created successfully");
+    //                setOpen(false);
+    //                resetForm();
+    //                loadGradings();
+    //            }
+    //        }
+    //    } catch (error: any) {
+    //        console.error("Error saving grading:", error);
+    //        alert(error?.response?.data?.message || "Failed to save grading. Please try again.");
+    //    }
+    //};
+
+    // Update resetForm to clear edit mode - around line 160
+    const resetForm = () => {
+        setFormData({
+            vesselValue: null,
+            vesselText: "",
+            partValue: null,
+            partText: "",
+            sectionValue: "",
+            sectionText: "",
+            grading_name: ""
+        });
+        setGradingName("");
+        setActivationStatus(null);
+        setReportStatus(null);
+        setPartOptions([]);
+        setSectionOptions([]);
+        setselectedVesselType("");
+
+        // Clear edit mode
+        setEditingGradingId(null);
+        setEditingSectionId(null);
+        setEditingTanktypeId(null);
+    };
+
+    // Update handleCancel - around line 163
+    const handleCancel = () => {
+        resetForm();
+        setOpen(false);
     };
     const columns = useMemo<Array<any>>(
         () => [
@@ -504,7 +650,11 @@ const ManageGradingList: React.FC = () => {
                 Cell: ({ row }: { row: { original: ManageGradingRow } }) => {
                     return (
                         <div className='d-flex justify-content-start gap-3'>
-                            <Button variant={BUTTONS.TABLEDOWNLOAD} startIcon={<Icon.PencilFill />}></Button>
+                            <Button
+                                variant={BUTTONS.TABLEDOWNLOAD}
+                                startIcon={<Icon.PencilFill />}
+                                onClick={() => handleEditGrading(row.original)}  // ADD: Call handleEditGrading
+                            ></Button>
                             <Button variant={BUTTONS.TABLEDOWNLOAD} onClick={() => (setDeleteModel(true))} startIcon={<Icon.TrashFill />}></Button>
                         </div>
                     );
@@ -580,7 +730,7 @@ const ManageGradingList: React.FC = () => {
                     <div className="grid-content-body">
                         <div className="row">
                             <div className="col-md-8">
-                                <h5 className='_600'>  Bulk Carrier - Grading</h5>
+                                <h5 className='_600'>Grading</h5>
                             </div>
                             <div className="col-md-6 mb-3 mt-2">
                                 <div className="d-flex justify-content-start align-items-center gap-2">
@@ -621,6 +771,7 @@ const ManageGradingList: React.FC = () => {
                                     pageOptions={["20", "30", "40", "50"]}
                                     allDataProvided
                                 />
+
                             )}
                         </div>
                     </div>
@@ -628,7 +779,7 @@ const ManageGradingList: React.FC = () => {
             </div>
             <Offcanvas show={open} placement={"end"} onHide={() => setOpen(false)} backdrop="static">
                 <Offcanvas.Header closeButton>
-                    <Offcanvas.Title>Add New ABS Grading</Offcanvas.Title>
+                    {editingGradingId ? "Edit ABS Grading" : "Add New ABS Grading"}
                 </Offcanvas.Header>
                 <Offcanvas.Body>
                     <div className="row">
@@ -637,20 +788,20 @@ const ManageGradingList: React.FC = () => {
                             <AbsSelect
                                 mult={false}
                                 options={vesselOptions}
+                                disabled={!!editingGradingId}
                                 selected={formData.vesselValue ? [formData.vesselValue] : []}
-                                // Vessel Template Select - around line 639
+
                                 onChange={(selected: any[]) => {
-                                    const selectedValue = selected?.[0]; // This is the VALUE (number: 1, 2, 3, etc.)
+                                    const selectedValue = selected?.[0];
                                     if (!selectedValue) return;
 
-                                    // Find the option object from vesselOptions by matching VALUE (not text)
                                     const opt = vesselOptions.find(option => option.value === selectedValue);
                                     if (!opt) return;
 
                                     setFormData(prev => ({
                                         ...prev,
-                                        vesselValue: opt.value, // NUMBER (Id: 1, 2, 3, etc.)
-                                        vesselText: opt.text,    // STRING (vessel type name: "Bulk Carrier", etc.)
+                                        vesselValue: opt.value,
+                                        vesselText: opt.text,
                                         partValue: null,
                                         partText: "",
                                         sectionValue: "",
@@ -660,17 +811,21 @@ const ManageGradingList: React.FC = () => {
                                     setPartOptions([]);
                                     setSectionOptions([]);
 
-                                    onVesselChange(opt.text); // Pass vessel type string
+                                    onVesselChange(opt.text);
                                 }}
                                 placeholder="Select Vessel Template"
                             />
-
+                            {(error && (![formData.vesselValue] || formData.vesselValue == "")) ?
+                                <div><label style={{ color: 'red' }}> Please Select Vessel Type</label></div> :
+                                <></>
+                            }
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Part Name" bold />
                             <AbsSelect
                                 mult={false}
                                 options={partOptions}
+                                disabled={!!editingGradingId}
                                 selected={formData.partValue ? [formData.partValue] : []}
                                 onChange={(selected: any[]) => {
                                     const selectedValue = selected?.[0]; // This is the VALUE (number: templateId)
@@ -694,13 +849,17 @@ const ManageGradingList: React.FC = () => {
                                 }}
                                 placeholder="Select Part Name"
                             />
-
+                            {(error && (![formData.partValue] || formData.partValue == null)) ?
+                                <div><label style={{ color: 'red' }}> Please Select Part Name</label></div> :
+                                <></>
+                            }
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Section Name" bold />
                             <AbsSelect
                                 mult={false}
                                 options={sectionOptions}
+                                disabled={!!editingGradingId}
                                 selected={formData.sectionValue ? [formData.sectionValue] : []}
                                 onChange={(selected: any[]) => {
                                     const selectedValue = selected?.[0]; // This is the VALUE (GUID string: sectionId)
@@ -714,12 +873,16 @@ const ManageGradingList: React.FC = () => {
 
                                     setFormData(prev => ({
                                         ...prev,
-                                        sectionValue: opt.value,  // GUID (sectionId)
-                                        sectionText: opt.text     // STRING (section name) - FIX: was 'opt', now 'opt.text'
+                                        sectionValue: opt.value,
+                                        sectionText: opt.text
                                     }));
                                 }}
                                 placeholder="Select Section Name"
                             />
+                            {(error && (![formData.sectionValue] || formData.sectionValue == null)) ?
+                                <div><label style={{ color: 'red' }}> Please Select Section Name</label></div> :
+                                <></>
+                            }
                         </div>
 
                         <div className="col-md-12 form-group">
@@ -773,7 +936,7 @@ const ManageGradingList: React.FC = () => {
                         <div className="col-md-12 form-group">
                             <div className="d-flex gap-2">
                                 <Button variant={BUTTONS.SECONDARY}>Cancel</Button>
-                                <Button variant={BUTTONS.PRIMARY} onClick={handleCreate}>Create</Button>
+                                <Button variant={BUTTONS.PRIMARY} onClick={handleCreate}>{editingGradingId ? "Update" : "Create"}</Button>
 
                             </div>
                         </div>
