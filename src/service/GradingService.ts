@@ -2,7 +2,7 @@ import axiosInstance from "./axiosInstance";
 import type { AxiosResponse } from "axios";
 import type { DataSourceRequest } from "../Interface/Grading";
 
-export function getGradings(request?: DataSourceRequest): Promise<AxiosResponse>  {
+export function getGradings(request?: DataSourceRequest): Promise<AxiosResponse> {
     const routePath = `/api/Grading/FilterMenuCustomization_Read`;
 
     const params: any = {};
@@ -44,35 +44,32 @@ export function createGrading(formData: {
     tanktypeId?: number;
 }): Promise<AxiosResponse> {
 
-
-    console.log(formData, "FormData CreateGrading");
-
     const routePath = `/api/ProjectConfig/AddNewGrading`;
     return axiosInstance.post(routePath, formData);
 }
 
-// Update Grading - PUT
-export function updateGrading(
-    id: number,
-    formData: {
-        vesselType: string;
-        templateName: string;
-        sectionName: string;
-        gradingName: string;
-        status: boolean;
-        requiredInReport: boolean;
-        gradingId?: number;
-        templateId?: number;
-        sectionId?: number;
-        tanktypeId?: number;
-    }
-): Promise<AxiosResponse> {
-    const routePath = `/api/Grading/UpdateGrading/${id}`;
-    return axiosInstance.put(routePath, {
-        ...formData,
-        gradingId: formData.gradingId || id
-    });
-}
+//// Update Grading - PUT
+//export function updateGrading(
+//    id: number,
+//    formData: {
+//        vesselType: string;
+//        templateName: string;
+//        sectionName: string;
+//        gradingName: string;
+//        status: boolean;
+//        requiredInReport: boolean;
+//        gradingId?: number;
+//        templateId?: number;
+//        sectionId?: number;
+//        tanktypeId?: number;
+//    }
+//): Promise<AxiosResponse> {
+//    const routePath = `/api/Grading/UpdateGrading/${id}`;
+//    return axiosInstance.put(routePath, {
+//        ...formData,
+//        gradingId: formData.gradingId || id
+//    });
+//}
 
 export function deleteGrading(gradingId: number, tankId: number = 0): Promise<AxiosResponse> {
     const routePath = `/api/Grading/DeleteGrading/${gradingId}`;
@@ -148,3 +145,59 @@ export function checkGradingNameExists(
 export const navigateToEditGrading = (gradingId: number, sectionId: number, tankTypeId: number): void => {
     window.location.href = `/app/Configuration/EditGradingById?gradingId=${gradingId}&SectionId=${sectionId}&TankTypeId=${tankTypeId}`;
 };
+
+export function updateGrading(formData: {
+    gradingId: number;
+    vesselType: string;
+    templateName: string;
+    sectionName: string;
+    gradingName: string;
+    status: boolean;
+    requiredInReport: boolean;
+    templateId?: number;
+    sectionId?: number;
+    tanktypeId?: number;
+}): Promise<AxiosResponse> {
+
+    const routePath = `/api/ProjectConfig/EditGrading`;
+    return axiosInstance.post(routePath, formData);
+}
+
+//export function updateGrading(
+//    id: number,
+//    formData: {
+//        vesselType: string;
+//        templateName: string;
+//        sectionName: string;
+//        gradingName: string;
+//        status: boolean;
+//        requiredInReport: boolean;
+//        gradingId?: number;
+//        templateId?: number;
+//        sectionId?: number;
+//        tanktypeId?: number;
+//    }
+//): Promise<AxiosResponse> {
+//    const routePath = `/api/ProjectConfig/EditGrading`;
+
+//    return axiosInstance.post(routePath, {
+//        GradingId: id,
+//        VesselType: formData.vesselType,
+//        TemplateName: formData.templateName,
+//        SectionName: formData.sectionName,
+//        GradingName: formData.gradingName,
+//        Status: formData.status,
+//        RequiredInReport: formData.requiredInReport,
+//        TemplateId: formData.templateId || 0,
+//        SectionId: formData.sectionId || 0,
+//        TanktypeId: formData.tanktypeId || 0,
+//        // Add empty/default values for other required fields
+//        Title: "",
+//        SaveText: "",
+//        sections: [],
+//        CancelUrl: "",
+//        Controller: "",
+//        PostAction: "",
+//        gradingslist: []
+//    });
+//}
