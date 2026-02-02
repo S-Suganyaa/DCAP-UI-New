@@ -83,9 +83,12 @@ const ManageGradingList: React.FC = () => {
     const [sectionOptions, setSectionOptions] = useState<SelectOption[]>([]);
     const [selectedVesselType, setselectedVesselType] = useState("");
     const [GradingName, setGradingName] = useState("");
-    const [activationStatus, setActivationStatus] = useState<boolean | null>(null);
-    const [reportStatus, setReportStatus] = useState<boolean | null>(null);
-
+    const [activationStatus, setActivationStatus] = useState<boolean | null>(true);
+    const [reportStatus, setReportStatus] = useState<boolean | null>(true);
+    const [selectedRow, setSelectedRow] = useState<ManageGradingRow | null>(null);
+    const [deleteGradingId, setDeleteGradingId] = useState<number | null>(null);
+    const [deleteTanktypeId, setDeleteTanktypeId] = useState<number | null>(null);
+    const [deletingGrading, setDeletingGrading] = useState<ManageGradingRow | null>(null);
     useEffect(() => {
         loadGradings();
         restoreFilters();
@@ -101,7 +104,6 @@ const ManageGradingList: React.FC = () => {
             );
         });
     }, []);
-
 
     const onVesselChange = (vesselType: string) => {
 
@@ -498,71 +500,7 @@ const ManageGradingList: React.FC = () => {
         } catch (error) { }
     };
 
-    //const handleCreate = async () => {
-    //    // Validation
-    //    if (!formData.vesselText || !formData.partText || !formData.sectionText || !GradingName.trim()) {
-    //        alert("Please fill in all required fields");
-    //        return;
-    //    }
 
-    //    if (activationStatus === null) {
-    //        alert("Please select Activation Status");
-    //        return;
-    //    }
-
-    //    if (reportStatus === null) {
-    //        alert("Please select Report Configuration");
-    //        return;
-    //    }
-
-    //    var formdata = {
-    //        vesselType: formData.vesselText,
-    //        templateName: formData.partText,
-    //        sectionName: formData.sectionText,
-    //        gradingName: GradingName.trim(),
-    //        status: activationStatus === true,
-    //        requiredInReport: reportStatus === true,
-    //    };
-
-    //    try {
-    //        if (editingGradingId) {
-
-    //            const res = await gradingService.updateGrading(editingGradingId, {
-    //                vesselType: formData.vesselText,
-    //                templateName: formData.partText,
-    //                sectionName: formData.sectionText,
-    //                gradingName: GradingName.trim(),
-    //                status: activationStatus === true,
-    //                requiredInReport: reportStatus === true,
-    //                gradingId: editingGradingId,
-    //                sectionId: editingSectionId || Number(formData.sectionValue),
-    //                tanktypeId: editingTanktypeId || 0,
-    //                templateId: formData.partValue || undefined,
-    //            });
-
-    //            if (res.data) {
-    //                alert("Grading updated successfully");
-    //                setOpen(false);
-    //                resetForm();
-    //                loadGradings();
-    //            }
-    //        } else {
-    //            // Create new grading
-    //            const res = await gradingService.createGrading(formdata);
-    //            if (res.data) {
-    //                alert("Grading created successfully");
-    //                setOpen(false);
-    //                resetForm();
-    //                loadGradings();
-    //            }
-    //        }
-    //    } catch (error: any) {
-    //        console.error("Error saving grading:", error);
-    //        alert(error?.response?.data?.message || "Failed to save grading. Please try again.");
-    //    }
-    //};
-
-    // Update resetForm to clear edit mode - around line 160
     const resetForm = () => {
         setFormData({
             vesselValue: null,
@@ -586,11 +524,7 @@ const ManageGradingList: React.FC = () => {
         setEditingTanktypeId(null);
     };
 
-    // Update handleCancel - around line 163
-    const handleCancel = () => {
-        resetForm();
-        setOpen(false);
-    };
+
     const columns = useMemo<Array<any>>(
         () => [
             {
@@ -655,7 +589,9 @@ const ManageGradingList: React.FC = () => {
                                 startIcon={<Icon.PencilFill />}
                                 onClick={() => handleEditGrading(row.original)}  // ADD: Call handleEditGrading
                             ></Button>
-                            <Button variant={BUTTONS.TABLEDOWNLOAD} onClick={() => (setDeleteModel(true))} startIcon={<Icon.TrashFill />}></Button>
+                            <Button variant={BUTTONS.TABLEDOWNLOAD} onClick={() => {
+                                handleDeleteClick(row.original);
+                            }} startIcon={<Icon.TrashFill />}></Button>
                         </div>
                     );
                 }
@@ -668,11 +604,10 @@ const ManageGradingList: React.FC = () => {
         updateVal("");
         updateSearchApplied(null);
         setFilters(null);
-        setHierarchicalFilters({}); // Clear hierarchical filters
+        setHierarchicalFilters({});
         localStorage.removeItem("SearchGradingFilter");
         localStorage.removeItem("GradingFilter");
 
-        // Reset pagination to first page (pageIndex 0 = 1-20)
         setAppliedFilters(prev => ({
             ...prev,
             pageIndex: 0,
@@ -703,6 +638,39 @@ const ManageGradingList: React.FC = () => {
             resetPageIndex: true
         }));
     }, []);
+
+    const handleDeleteClick = (row: ManageGradingRow) => {
+
+        console.log(row, "deleteclick");
+
+        setDeleteGradingId(row.gradingId);
+        setDeleteTanktypeId(row.tanktypeId);
+        setDeletingGrading(row);   
+        setDeleteModel(true);
+    };
+
+
+    const handleConfirmDelete = async () => {
+        if (deleteGradingId == null || deleteTanktypeId == null) return;
+
+        try {
+            await gradingService.deleteGrading(
+                deleteGradingId,
+                deleteTanktypeId
+            );
+
+            setDeleteModel(false);
+            setDeleteGradingId(null);
+            setDeleteTanktypeId(null);
+            setDeletingGrading(null);
+
+            loadGradings(); // reload table
+        } catch (error) {
+           
+        }
+    };
+
+
 
     return (
         <>
@@ -956,7 +924,7 @@ const ManageGradingList: React.FC = () => {
                                     <Icon.Trash size={24} />
                                 </div>
                                 <p className='_500 tx-14'>
-                                    Are you sure you want to delete 'Mooring Winches with Foundations' Grading?
+                                    Are you sure you want to delete <b> {deletingGrading?.gradingName}</b> Grading?
 
                                 </p>
                             </div>
@@ -966,9 +934,10 @@ const ManageGradingList: React.FC = () => {
                     <Button variant={BUTTONS.SECONDARY} onClick={() => setDeleteModel(false)}>
                         Cancel
                     </Button>
-                    <Button variant={BUTTONS.PRIMARY} onClick={() => setDeleteModel(false)}>
-                        Save Changes
+                    <Button variant={BUTTONS.PRIMARY} onClick={handleConfirmDelete}>
+                        Delete
                     </Button>
+
                 </Modal.Footer>
             </Modal>
         </>
