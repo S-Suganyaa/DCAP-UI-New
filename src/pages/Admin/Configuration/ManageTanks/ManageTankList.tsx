@@ -4,7 +4,10 @@ import * as Icon from 'react-bootstrap-icons';
 import ManageTankTemplateList from './ManageTankTemplateList';
 import { Modal, Offcanvas } from 'react-bootstrap';
 import * as tankService from '../../../../service/TankService';
+import * as gradingService from '../../../../service/GradingService';
 interface ManageTankRow {
+    tankId?: string;
+    templateId?: number;
     vesselType: string;
     tankType: string;
     status: string;
@@ -12,12 +15,22 @@ interface ManageTankRow {
     subheader: string;
 }
 
-type FormData = {
-    tank_name: string;
-    subheader_name: string;
-    vessel_type: string;
-    tank_type: string;
-    activation_status: boolean;
+type TankFormState = {
+    tankName: string;
+    subheader: string;
+
+    vesselValue: string | number | null;
+    vesselText: string;
+
+    tankTypeValue: string | number | null;
+    tankTypeText: string;
+
+    status: boolean;
+};
+
+type SelectOption = {
+    text: string;
+    value: number | string;
 };
 const ManageTankList: React.FC = () => {
     const [val, updateVal] = React.useState<string>("");
@@ -39,15 +52,23 @@ const ManageTankList: React.FC = () => {
         tankName?: string;
         tankType?: string;
     }>({});
-    const [formData, setFormData] = React.useState<FormData>({
-        tank_name: "",
-        subheader_name: "",
-        vessel_type: "",
-        tank_type: "",
-
-        activation_status: false,
-
+    const [formData, setFormData] = useState<TankFormState>({
+        tankName: "",
+        subheader: "",
+        vesselValue: null,
+        vesselText: "",
+        tankTypeValue: null,
+        tankTypeText: "",
+        status: true
     });
+
+    const [vesselOptions, setVesselOptions] = useState<SelectOption[]>([]);
+    const [tankOptions, setTankOptions] = useState<SelectOption[]>([]);
+    const [editingTankId, setEditingTankId] = useState<string | null>(null);
+    const [selectedStatus, setSelectedStatus] = useState<number>(1);
+    const [error, setError] = React.useState<boolean>();
+    const [deletingTank, setDeletingTank] = useState<ManageTankRow | null>(null);
+
     const initialFilterState = {
         searchType: "list",
         resetPageIndex: false,
@@ -66,13 +87,139 @@ const ManageTankList: React.FC = () => {
     useEffect(() => {
         loadTankList();
     }, []);
-    // Fix loadTankList - around line 70
+
+    useEffect(() => {
+        gradingService.getVesselType().then(res => {
+            setVesselOptions(
+                res.data.data.map((v: any) => ({
+                    text: v.vesselType,
+                    value: v.id
+                }))
+            );
+        });
+    }, []);
+
+    const onVesselChange = (vesselType: string) => {
+        tankService.GetMappedTankTypes(0, vesselType).then(res => {
+
+            setTankOptions(
+                res.data.map((p: any) => ({
+                    text: p.tankType,
+                    value: p.id
+                }))
+            );
+        });
+    };
+    const normalizeStatus = (status: any): boolean => {
+        if (typeof status === "boolean") return status;
+        if (typeof status === "number") return status === 1;
+        if (typeof status === "string")
+            return status.toLowerCase() === "active" || status === "1" || status === "true";
+        return false;
+    };
+
+    const handleEditTank = async (row: ManageTankRow) => {
+        const isActive = normalizeStatus(row.status);
+
+        setVesselOptions([
+            {
+                text: row.vesselType,
+                value: row.vesselType
+            }
+        ]);
+
+        setTankOptions([
+            {
+                text: row.tankType,
+                value: row.tankType
+            }
+        ]);
+
+        setFormData({
+            tankName: row.tankName,
+            subheader: row.subheader,
+
+            vesselValue: row.vesselType,
+            vesselText: row.vesselType,
+
+            tankTypeValue: row.tankType,
+            tankTypeText: row.tankType,
+
+            status: isActive
+        });
+
+        setEditingTankId(row.tankId ?? null);
+        setOpen(true);
+    };
+
+
+    const handleSaveTank = async () => {
+        if (!formData.tankName.trim() || !formData.vesselText || !formData.tankTypeText.trim()) {
+            setError(true);
+            return;
+        }
+
+        const payload = {
+            tankName: formData.tankName,
+            subheader: formData.subheader,
+            vesselType: formData.vesselText,
+            tankType: formData.tankTypeText,
+            status: formData.status
+        };
+        if (editingTankId) {
+            await tankService.updateTank({
+                ...payload,
+                tankId: editingTankId
+            });
+        } else {
+            await tankService.createTank(payload);
+        }
+
+        setOpen(false);
+        resetForm();
+        loadTankList();
+    };
+
+    const handleDeleteTank = async () => {
+        if (!deletingTank?.tankId) return;
+
+        try {
+            await tankService.deleteTank(
+                deletingTank.tankId,
+                "",   // IMO
+                0     // ProjectId
+            );
+
+            setDeleteModel(false);
+            setDeletingTank(null);
+
+            loadTankList(); // refresh grid
+        } catch (err) {
+            console.error("Delete Tank failed", err);
+        }
+    };
+
+
+    const resetForm = () => {
+        setEditingTankId(null);
+        setFormData({
+            tankName: "",
+            subheader: "",
+            vesselValue: null,
+            vesselText: "",
+            tankTypeValue: null,
+            tankTypeText: "",
+            status: true
+        });
+        setTankOptions([]);
+    };
+
+
     const loadTankList = async () => {
         try {
             setLoading(true);
 
             const res = await tankService.getTanks();
-            console.log(res.data, "raw api data");
 
             let rawData: any[] = [];
 
@@ -83,23 +230,19 @@ const ManageTankList: React.FC = () => {
             } else if (Array.isArray(res.data?.Data)) {
                 rawData = res.data.Data;
             }
-
             const mappedData: ManageTankRow[] = rawData.map(item => ({
+                tankId: item.tankId ?? item.tankId ?? "",
                 vesselType: item.vesselType ?? item.VesselType ?? "",
                 tankType: item.tankType ?? item.TankType ?? "",
-                status: item.status ?? item.Status ?? "",
+                status: item.status ?? item.status ?? "",
                 tankName: item.tankName ?? item.TankName ?? "",
-                subheader: item.subheader ?? item.Subheader ?? ""
+                subheader: item.subheader ?? item.Subheader ?? "",
             }));
 
-            console.log(mappedData, "mapped table data");
-
-            // FIX: Set TankFilter for pagination/search
             setTankFilter(mappedData);
             setDataCount(mappedData.length);
 
         } catch (error) {
-            console.error("Error loading tanks:", error);
         } finally {
             setLoading(false);
         }
@@ -315,25 +458,24 @@ const ManageTankList: React.FC = () => {
         }
     }, [TankFilter]);
 
-    // Fix columns definition - around line 320
     const columns = useMemo<Array<any>>(
         () => [
             {
                 label: "Vessel Type",
                 accessorKey: "vesselType",
-                accessor: "vesselType",  // ADD: Required for table
+                accessor: "vesselType",
                 cell: (info: { getValue: () => any }) => info.getValue(),
             },
             {
                 label: "Tank Type",
                 accessorKey: "tankType",
-                accessor: "tankType",  // ADD: Required for table
+                accessor: "tankType",
                 cell: (info: { getValue: () => any }) => info.getValue(),
             },
             {
                 label: "Status",
                 accessorKey: "status",
-                accessor: "status",  // ADD: Required for table
+                accessor: "status",
                 Cell: ({ row }: any) => (
                     <div className="d-flex justify-content-center">
                         <CheckboxInput
@@ -348,15 +490,36 @@ const ManageTankList: React.FC = () => {
             {
                 label: "Tank Name",
                 accessorKey: "tankName",
-                accessor: "tankName",  // ADD: Required for table
+                accessor: "tankName",
                 cell: (info: { getValue: () => any }) => info.getValue(),
             },
             {
                 label: "Subheader",
                 accessorKey: "subheader",
-                accessor: "subheader",  // ADD: Required for table
+                accessor: "subheader",
                 cell: (info: { getValue: () => any }) => info.getValue(),
-            }
+            },
+            {
+                label: "Action",
+                accessor: "action",
+                accessorKey: "action",
+                filter: false,
+                Cell: ({ row }: { row: { original: ManageTankRow } }) => {
+                    return (
+                        <div className='d-flex justify-content-start gap-3'>
+                            <Button
+                                variant={BUTTONS.TABLEDOWNLOAD}
+                                startIcon={<Icon.PencilFill />}
+                                onClick={() => handleEditTank(row.original)}
+                            ></Button>
+                            <Button variant={BUTTONS.TABLEDOWNLOAD} onClick={() => {
+                                setDeletingTank(row.original);
+                                setDeleteModel(true);
+                            }} startIcon={<Icon.TrashFill />}></Button>
+                        </div>
+                    );
+                }
+            },
         ],
         []
     );
@@ -445,67 +608,112 @@ const ManageTankList: React.FC = () => {
             </div>
             <Offcanvas show={open} placement={"end"} onHide={() => setOpen(false)} backdrop="static">
                 <Offcanvas.Header closeButton>
-                    <Offcanvas.Title>Add New Tank</Offcanvas.Title>
+                    <Offcanvas.Title>
+                        {editingTankId ? "Edit Tank" : "Add New Tank"}
+                    </Offcanvas.Title>
                 </Offcanvas.Header>
                 <Offcanvas.Body>
                     <div className="row">
                         <div className="col-md-12 form-group">
                             <Label name="Tank Name" bold />
                             <Input
-                                label=""
                                 placeholder="Enter Tank Name"
-                                value={formData.tank_name}
-                                onChange={(e: any) => setFormData({ ...formData, tank_name: e.target.value })}
+                                value={formData.tankName}
+                                onChange={(value: string) =>
+                                    setFormData(prev => ({ ...prev, tankName: value }))
+                                }
                             />
+                            {(error && (![formData.tankName] || formData.tankName == "" || formData.tankName == null)) ?
+                                <div><label style={{ color: 'red' }}> Tank Name Required</label></div> :
+                                <></>
+                            }
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Subheader" bold />
                             <Input
                                 placeholder="Enter Subheader Name"
-                                value={formData.subheader_name}
-                                onChange={(e: any) => setFormData({ ...formData, subheader_name: e.target.value })}
+                                value={formData.subheader}
+                                onChange={(value: string) =>
+                                    setFormData(prev => ({ ...prev, subheader: value }))
+                                }
                             />
+
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Select a Vessel Type" bold />
-                            <AbsSelect mult={false}
-                                onChange={(selected: string[] | any) =>
-                                    setFormData({ ...formData, vessel_type: (selected && selected[0]) || "" })
-                                }
-                                options={[
-                                    { text: "Bulk Carrier", value: "1" },
-                                    { text: "Gas Carrier", value: "2" },
-                                ]}
-                                selected={[formData.vessel_type]}
+                            <AbsSelect
+                                options={vesselOptions}
+                                mult={false}
+                                disabled={!!editingTankId}
+                                selected={formData.vesselValue ? [formData.vesselValue] : []}
+                                onChange={(selected: any[]) => {
+                                    const value = selected?.[0];
+                                    if (!value) return;
+
+                                    const opt = vesselOptions.find(o => o.value === value);
+                                    if (!opt) return;
+
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        vesselValue: opt.value,
+                                        vesselText: opt.text,
+                                        tankTypeValue: null,
+                                        tankTypeText: ""
+                                    }));
+
+                                    onVesselChange(opt.text);
+                                }}
                                 placeholder="Select a Vessel Type"
                             />
+                            {(error && (![formData.vesselValue] || formData.vesselValue == null)) ?
+                                <div><label style={{ color: 'red' }}> Vessel Type Required</label></div> :
+                                <></>
+                            }
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Tank Type" bold />
-                            <AbsSelect mult={false}
-                                onChange={(selected: string[] | any) =>
-                                    setFormData({ ...formData, tank_type: (selected && selected[0]) || "" })
-                                }
-                                options={[
-                                    { text: "Cargo Tank", value: "1" },
-                                    { text: "Slop Tank", value: "2" },
-                                ]}
-                                selected={[formData.tank_type]}
-                                placeholder="Select a Tank Type "
+                            <AbsSelect
+                                options={tankOptions}
+                                mult={false}
+                                disabled={!!editingTankId}
+                                selected={formData.tankTypeValue ? [formData.tankTypeValue] : []}
+                                onChange={(selected: any[]) => {
+                                    const value = selected?.[0];
+                                    if (!value) return;
+
+                                    const opt = tankOptions.find(o => o.value === value);
+                                    if (!opt) return;
+
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        tankTypeValue: opt.value,
+                                        tankTypeText: opt.text
+                                    }));
+                                }}
+                                placeholder="Select a Tank Type"
                             />
+                            {(error && (![formData.tankTypeValue] || formData.tankTypeValue == null)) ?
+                                <div><label style={{ color: 'red' }}> Tank Type Required</label></div> :
+                                <></>
+                            }
                         </div>
                         <div className="col-md-12 form-group">
                             <Label name="Activation Status" bold />
                             <div className='d-flex justify-contentn-start gap-3'>
                                 <RadioInput
                                     label="Active"
-                                    checked={selected === 1}
-                                    onChange={() => setSelected(1)}
+                                    checked={formData.status === true}
+                                    onChange={() =>
+                                        setFormData(prev => ({ ...prev, status: true }))
+                                    }
                                 />
+
                                 <RadioInput
                                     label="Inactive"
-                                    checked={selected === 2}
-                                    onChange={() => setSelected(2)}
+                                    checked={formData.status === false}
+                                    onChange={() =>
+                                        setFormData(prev => ({ ...prev, status: false }))
+                                    }
                                 />
 
                             </div>
@@ -515,8 +723,16 @@ const ManageTankList: React.FC = () => {
                         </div>
                         <div className="col-md-12 form-group">
                             <div className="d-flex gap-2">
-                                <Button variant={BUTTONS.PRIMARY}>Create</Button>
-                                <Button variant={BUTTONS.SECONDARY}>Cancel</Button>
+                                <Button variant={BUTTONS.PRIMARY} onClick={handleSaveTank}>
+                                    {editingTankId ? "Update" : "Create"}
+                                </Button>
+
+                                <Button variant={BUTTONS.SECONDARY} onClick={() => {
+                                    setOpen(false);
+                                    resetForm();
+                                }}
+                                > Cancel</Button>
+
                             </div>
                         </div>
 
@@ -535,7 +751,7 @@ const ManageTankList: React.FC = () => {
                                     <Icon.Trash size={24} />
                                 </div>
                                 <p className='_500 tx-14'>
-                                    Are you sure you want to delete 'Mooring Winches with Foundations' Grading?
+                                    Are you sure you want to delete <b> {deletingTank?.tankName}</b> Tank?
 
                                 </p>
                             </div>
@@ -546,9 +762,11 @@ const ManageTankList: React.FC = () => {
                     <Button variant={BUTTONS.SECONDARY} onClick={() => setDeleteModel(false)}>
                         Cancel
                     </Button>
-                    <Button variant={BUTTONS.PRIMARY} onClick={() => setDeleteModel(false)}>
-                        Save Changes
+
+                    <Button variant={BUTTONS.PRIMARY} onClick={handleDeleteTank}>
+                        Delete
                     </Button>
+
                 </Modal.Footer>
             </Modal>
         </>

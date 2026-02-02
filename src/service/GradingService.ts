@@ -71,13 +71,6 @@ export function createGrading(formData: {
 //    });
 //}
 
-export function deleteGrading(gradingId: number, tankId: number = 0): Promise<AxiosResponse> {
-    const routePath = `/api/Grading/DeleteGrading/${gradingId}`;
-    return axiosInstance.post(routePath, null, {
-        params: { tankId }
-    });
-}
-
 export function getVesselTypeFilter(): Promise<AxiosResponse> {
     const routePath = `/api/Grading/GradingVesselTypeFilter_VesselType`;
     return axiosInstance.get(routePath);
@@ -162,42 +155,10 @@ export function updateGrading(formData: {
     const routePath = `/api/ProjectConfig/EditGrading`;
     return axiosInstance.post(routePath, formData);
 }
+export function deleteGrading(deleteGradingId: number, deleteTanktypeId: number): Promise<AxiosResponse> {
+    return axiosInstance.post("/api/ProjectConfig/DeleteGrading", {
+        gradingId: deleteGradingId,
+        tankId: deleteTanktypeId
+    });
+}
 
-//export function updateGrading(
-//    id: number,
-//    formData: {
-//        vesselType: string;
-//        templateName: string;
-//        sectionName: string;
-//        gradingName: string;
-//        status: boolean;
-//        requiredInReport: boolean;
-//        gradingId?: number;
-//        templateId?: number;
-//        sectionId?: number;
-//        tanktypeId?: number;
-//    }
-//): Promise<AxiosResponse> {
-//    const routePath = `/api/ProjectConfig/EditGrading`;
-
-//    return axiosInstance.post(routePath, {
-//        GradingId: id,
-//        VesselType: formData.vesselType,
-//        TemplateName: formData.templateName,
-//        SectionName: formData.sectionName,
-//        GradingName: formData.gradingName,
-//        Status: formData.status,
-//        RequiredInReport: formData.requiredInReport,
-//        TemplateId: formData.templateId || 0,
-//        SectionId: formData.sectionId || 0,
-//        TanktypeId: formData.tanktypeId || 0,
-//        // Add empty/default values for other required fields
-//        Title: "",
-//        SaveText: "",
-//        sections: [],
-//        CancelUrl: "",
-//        Controller: "",
-//        PostAction: "",
-//        gradingslist: []
-//    });
-//}
