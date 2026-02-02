@@ -69,3 +69,9 @@ $font-weights: (100, 200, 300, 400, 500, 600, 700, 800, 900); // Font weights in
         font-weight: #{$weight} !important;
     }
 }
+
+.center-divider{
+  border: 0;
+    border-top: 1px solid rgb(34 1 1) !important;
+
+}
