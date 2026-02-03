@@ -87,7 +87,7 @@ const handleNext = async () => {
     }
   } else {
     // Regular user - Navigate directly to Project page
-    navigate("/app/Project", { replace: true });
+      navigate("/app/Configuration/Managetemplate", { replace: true });
   }
 };
 
@@ -114,7 +114,7 @@ const handleLogin = async () => {
     }
 
     // Navigate to Project page instead of /app
-    navigate("/app/Project", { replace: true });
+      navigate("/app/Configuration/Managetemplate", { replace: true });
   } catch (err: any) {
     const errorMessage = err?.response?.data?.message || 
                         err?.response?.data?.error ||

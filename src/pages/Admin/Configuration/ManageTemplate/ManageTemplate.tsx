@@ -39,8 +39,7 @@ const ManageTemplate: React.FC = () => {
     const [selectedSequenceNo, setSelectedSequenceNo] = useState<string>("");
     const [selectedPartId, setSelectedPartId] = useState<number | null>(null);
     const [deletePartData, setDeletePartData] = useState<any>(null);
-
-
+    
     const [newPart, setNewPart] = useState({
         sequenceNo: "",
         partName: "",

@@ -22,13 +22,17 @@ const AppRoutes = () => (
             <Route path="/success" element={<Success />} />
 
             <Route path="/app" element={<AppLayout />}>
-                <Route index element={<ProjectList />} />
+                <Route
+                    index
+                    element={<Navigate to="Configuration/Managetemplate" replace />}
+                />
                 <Route path="Project" element={<ProjectList />} />
                 <Route path="Configuration/Managetemplate" element={<ManageTemplate />} />
                 <Route path="Configuration/Managedescriptions" element={<ManageDescriptionList />} />
                 <Route path="Configuration/ManageTanks" element={<Tanks />} />
                 <Route path="Configuration/Manageabsgrading" element={<ManageGradingList />} />
             </Route>
+
 
             {/* Legacy route */}
             <Route path="/Layout" element={<AppLayout />} />

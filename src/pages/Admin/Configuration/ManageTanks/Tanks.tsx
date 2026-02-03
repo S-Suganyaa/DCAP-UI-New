@@ -23,7 +23,7 @@ const Tanks: React.FC = () => {
                             link: ""
                         }
                     ]}>
-                    <Button onClick={() => (setOpen(true))}> Add New Tank</Button>
+                    {/*<Button onClick={() => (setOpen(true))}> Add New Tank</Button>*/}
                 </BreadcrumbBar>
             </div>
             <div className="page-content p-4">

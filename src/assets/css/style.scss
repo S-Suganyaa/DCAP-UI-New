@@ -51,5 +51,17 @@ a {
 a:hover {
     text-decoration: none !important;
 }
- 
-  
+
+.child-nav-link.active {
+    font-weight: 700;
+    color: #002a4e;
+}
+
+.nav-item.active > .nav-link {
+    background-color: #002a4e;
+    color: #fff;
+}
+.child-nav-link.is-active {
+    font-weight: 700; /* already used */
+    color: #002a4e; /* already used */
+}

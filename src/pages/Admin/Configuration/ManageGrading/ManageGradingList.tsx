@@ -56,7 +56,7 @@ const ManageGradingList: React.FC = () => {
     const [showInfoPopup, setShowInfoPopup] = useState(false);
     const [popupPageName, setPopupPageName] = useState<string | undefined>();
     const [isSaving, setIsSaving] = useState(false);
-
+    const [responseMsg, setResponseMsg] = React.useState<boolean>();
     const [formData, setFormData] = useState<FormData>({
         vesselValue: null,
         vesselText: "",
@@ -143,59 +143,70 @@ const ManageGradingList: React.FC = () => {
             });
     };
 
+    const isDuplicateGrading = () => {
+        return GradingFilter.some(g =>
+            g.vesselType === formData.vesselText &&
+            g.templateName === formData.partText &&
+            g.sectionName === formData.sectionText &&
+            g.gradingName.trim().toLowerCase() === GradingName.trim().toLowerCase() &&
+            g.gradingId !== editingGradingId // 
+        );
+    };
 
     const handleCreate = async () => {
-
-        // Validation
         if (!formData.vesselText || !formData.partText || !formData.sectionText || !GradingName.trim()) {
             setError(true);
             return;
         }
 
-        //if (activationStatus === null) {
-        //    alert("Please select Activation Status");
-        //    return;
-        //}
-
-        //if (reportStatus === null) {
-        //    alert("Please select Report Configuration");
-        //    return;
-        //}
-        if (editingGradingId) {
-            var formdata = {
-                gradingId: editingGradingId,
-                vesselType: formData.vesselText,
-                templateName: formData.partText,
-                sectionName: formData.sectionText,
-                gradingName: GradingName,
-                isActive: activationStatus === true,
-                requiredInReport: reportStatus === true,
-            };
-
-            await gradingService.updateGrading(formdata).then(res => {
-                setOpen(false);
-                loadGradings();
-            });
-        } else {
-            var formdata = {
-                vesselType: formData.vesselText,
-                templateName: formData.partText,
-                sectionName: formData.sectionText,
-                sectionId: formData.sectionValue,
-                gradingName: GradingName,
-                isActive: activationStatus === true,
-                requiredInReport: reportStatus === true,
-            };
-
-            await gradingService.createGrading(formdata).then(res => {
-                setOpen(false);
-                loadGradings();
-            });
+        if (isDuplicateGrading()) {
+            setResponseMsg(true);
+            return;
         }
 
-        setOpen(false);
+        setIsSaving(true); // 
 
+        try {
+            if (editingGradingId) {
+                const formdata = {
+                    gradingId: editingGradingId,
+                    vesselType: formData.vesselText,
+                    templateName: formData.partText,
+                    sectionName: formData.sectionText,
+                    sectionId: formData.sectionValue,
+                    gradingName: GradingName,
+                    isActive: activationStatus === true,
+                    requiredInReport: reportStatus === true,
+                };
+
+                await gradingService.updateGrading(formdata);
+
+                setPopupPageName("UpdateGrading");
+            } else {
+                const formdata = {
+                    vesselType: formData.vesselText,
+                    templateName: formData.partText,
+                    sectionName: formData.sectionText,
+                    sectionId: formData.sectionValue,
+                    gradingName: GradingName,
+                    isActive: activationStatus === true,
+                    requiredInReport: reportStatus === true,
+                };
+
+                await gradingService.createGrading(formdata);
+
+                setPopupPageName("CreateGrading");
+            }
+
+            setShowInfoPopup(true);   // show success popup
+            loadGradings();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSaving(false); // 
+        }
     };
+
 
     const cleanString = (str: string) =>
         str
@@ -649,9 +660,6 @@ const ManageGradingList: React.FC = () => {
     }, []);
 
     const handleDeleteClick = (row: ManageGradingRow) => {
-
-        console.log(row, "deleteclick");
-
         setDeleteGradingId(row.gradingId);
         setDeleteTanktypeId(row.tanktypeId);
         setDeletingGrading(row);
@@ -660,25 +668,23 @@ const ManageGradingList: React.FC = () => {
 
 
     const handleConfirmDelete = async () => {
-        if (deleteGradingId == null || deleteTanktypeId == null) return;
+      
+        setIsSaving(true);
 
         try {
-            await gradingService.deleteGrading(
-                deleteGradingId,
-                deleteTanktypeId
-            );
+            await gradingService.deleteGrading(deleteGradingId, deleteTanktypeId);
 
             setDeleteModel(false);
-            setDeleteGradingId(null);
-            setDeleteTanktypeId(null);
-            setDeletingGrading(null);
+            setPopupPageName("DeleteGrading");
+            setShowInfoPopup(true);
 
-            loadGradings(); // reload table
-        } catch (error) {
-
+            loadGradings();
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsSaving(false);
         }
     };
-
 
 
     const gradingHeaderTitle = useMemo(() => {
@@ -871,8 +877,8 @@ const ManageGradingList: React.FC = () => {
                                 placeholder="Select Section Name"
                             />
                             {(error && (![formData.sectionValue] || !formData.sectionValue || formData.sectionValue == null)) ?
-                            <div><label style={{ color: 'red' }}> Please Select Section Name</label></div> :
-                            <></>
+                                <div><label style={{ color: 'red' }}> Please Select Section Name</label></div> :
+                                <></>
                             }
                         </div>
 
@@ -930,10 +936,15 @@ const ManageGradingList: React.FC = () => {
                         </div>
                         <div className="col-md-12 form-group">
                             <div className="d-flex gap-2">
-                                <Button variant={BUTTONS.PRIMARY} onClick={handleCreate}>{editingGradingId ? "Update" : "Create"}</Button>
+                                <Button variant={BUTTONS.PRIMARY} onClick={handleCreate} disabled={isSaving}>{editingGradingId ? "Update" : "Create"}</Button>
                                 <Button variant={BUTTONS.SECONDARY} onClick={() => setOpen(false)}>Cancel</Button>
 
                             </div>
+                            {(responseMsg) ?
+                                <div><label style={{ color: 'red' }}>Grading Already Exist</label></div> :
+                                <></>
+                            }
+
                         </div>
 
                     </div>
@@ -967,6 +978,18 @@ const ManageGradingList: React.FC = () => {
 
                 </Modal.Footer>
             </Modal>
+            {showInfoPopup && (
+                <InformationPopup
+                    onShow={showInfoPopup}
+                    onClose={() => {
+                        setShowInfoPopup(false);
+                        setOpen(false);
+                        resetForm();           // optional clean reset
+                    }}
+                    pageName={popupPageName}
+                />
+            )}
+
         </>
     );
 };

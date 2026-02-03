@@ -39,12 +39,15 @@ export default function InformationPopup({
         onClose();
     };
 
+    console.log(pageName, "pageName");
+
     return (
         <>
             <Modal size="lg" show={onShow} onHide={handleClose} centered>
                 <Modal.Header>
                     <Modal.Title>
-                        {GetTitle(pageName)}
+                        {/*{GetTitle(pageName)}*/}
+                        Manage Grading
                     </Modal.Title>
                     <button
                         type="button"
