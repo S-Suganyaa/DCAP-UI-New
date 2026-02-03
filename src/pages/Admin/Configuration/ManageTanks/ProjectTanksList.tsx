@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BreadcrumbBar, Button, AbsReactTable, BUTTONS, Divider, Input, AbsSelect, AbsSearch, ConversationCollapse, CheckboxInput, RadioInput, Label } from "customer_portal-ui-shared";
 import * as Icon from 'react-bootstrap-icons';
 import ManageTankTemplateList from './ManageTankTemplateList';
 import { Modal, Offcanvas } from 'react-bootstrap';
-
+import type { TankDto, SelectOption, ManageTankResponse } from "../../../../Interface/ProjectTank";
+import * as tankService from '../../../../service/TankService';
 interface ManageTankRow {
     tank_name: string;
     subheader_name: string;
@@ -32,8 +33,21 @@ const ProjectTankList: React.FC = () => {
     const [selected, setSelected] = React.useState<number | undefined>();
     const [deleteModel, setDeleteModel] = React.useState<boolean>();
     const [statusModel, setStatusModel] = React.useState<boolean>();
-    const [actstatus, setActStatusModel] = React.useState<boolean>();
+    const [actstatus, setActStatusModel] = React.useState<number | undefined>();
     const [selectedRows, setSelectedRows] = React.useState([]);
+    const [loading, setLoading] = React.useState(false);
+
+    const [tanks, setTanks] = React.useState<TankDto[]>([]);
+    const [filteredTanks, setFilteredTanks] = React.useState<TankDto[]>([]);
+
+    const [imoOptions, setImoOptions] = React.useState<SelectOption[]>([]);
+    const [tankTypeOptions, setTankTypeOptions] = React.useState<SelectOption[]>([]);
+    const [tankNameOptions, setTankNameOptions] = React.useState<SelectOption[]>([]);
+    const [statusOptions, setStatusOptions] = React.useState<SelectOption[]>([]);
+
+    const [tableData, setTableData] = React.useState<any[]>([]);
+    const [selectedIMO, setSelectedIMO] = React.useState<string>("");
+
 
     const [formData, setFormData] = React.useState<FormData>({
         tank_name: "",
@@ -46,6 +60,30 @@ const ProjectTankList: React.FC = () => {
         project_name: ""
 
     });
+    useEffect(() => {
+        loadManageTanks(formData.imo_number || undefined);
+    }, [formData.imo_number]);
+
+    const loadManageTanks = async (imo?: string) => {
+        setLoading(true);
+        try {
+            const res = await tankService.getManageTanks({ imo });
+            const data = res.data; 
+
+            //setTanks(data.tanks);
+           // setFilteredTanks(data.tanks);
+
+            setImoOptions(data.imoNumberOptions);
+            setTankTypeOptions(data.tankTypeOptions);
+            setTankNameOptions(data.tankNameOptions);
+            setStatusOptions(data.tankStatusOptions);
+        } catch (e) {
+           
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const columns = React.useMemo<Array<any>>(
         () => [
             {
@@ -110,35 +148,16 @@ const ProjectTankList: React.FC = () => {
         []
     );
 
-    const data = React.useMemo<ManageTankRow[]>(
-        () => [
-            {
-                tank_name: "Part A",
-                subheader_name: "Anchoring and Mooring",
-                vessel_type: "Chain Stopper",
-                vessel_name: "Active",
-                imo_number: "yes",
-                tank_type: "yes"
-            },
-            {
-                tank_name: "Part B",
-                subheader_name: "Deck Fitting",
-                vessel_type: "Mooring Winches with Foundations",
-                vessel_name: "InActive",
-                imo_number: "no",
-                tank_type: "yes"
-            },
-            {
-                tank_name: "Part C",
-                subheader_name: "Deck Piping",
-                vessel_type: "Windlasses with Foundations",
-                vessel_name: "Active",
-                imo_number: "yes",
-                tank_type: "yes"
-            }
-        ],
-        []
-    );
+    const tableRows = filteredTanks.map(t => ({
+        tank_name: t.tankName,
+        subheader_name: t.subheader,
+        vessel_type: t.vesselType,
+        vessel_name: t.vesselName,
+        imo_number: t.imoNumber,
+        tank_type: t.tankType,
+        status: t.status ? "Active" : "InActive"
+    }));
+
 
     return (
         <>
@@ -146,75 +165,73 @@ const ProjectTankList: React.FC = () => {
                 <div className="row">
                     <div className="col-md-2 form-group">
                         <Label name="IMO Number" bold />
-                        <AbsSelect mult={false}
-                            onChange={(selected: string[] | any) =>
-                                setFormData({ ...formData, imo_number: (selected && selected[0]) || "" })
-                            }
-                            options={[
-                                { text: "Bulk Carrier", value: "1" },
-                                { text: "Gas Carrier", value: "2" },
-                            ]}
-                            selected={[formData.imo_number]}
+                        <AbsSelect
+                            mult={false}
+                            options={imoOptions.map(o => ({
+                                text: o.text,
+                                value: o.value
+                            }))}
+                            selected={formData.imo_number ? [formData.imo_number] : []}
                             placeholder="Select IMO Number"
+                            onChange={(selected) => {
+                                const imo = selected?.[0] ?? "";
+                                setFormData(prev => ({ ...prev, imo_number: imo }));
+                                loadManageTanks(imo); 
+                            }}
                         />
-                    </div>
-                    <div className="col-md-2 form-group">
-                        <Label name="Select a Vessel Type" bold />
-                        <AbsSelect mult={false}
-                            onChange={(selected: string[] | any) =>
-                                setFormData({ ...formData, project_name: (selected && selected[0]) || "" })
-                            }
-                            options={[
-                                { text: "Bulk Carrier", value: "1" },
-                                { text: "Gas Carrier", value: "2" },
-                            ]}
-                            selected={[formData.project_name]}
-                            placeholder="Select Project Name"
-                        />
+
+
                     </div>
                     <div className="col-md-2 form-group">
                         <Label name="Select a Tank Type" bold />
-                        <AbsSelect mult={false}
-                            onChange={(selected: string[] | any) =>
-                                setFormData({ ...formData, tank_type: (selected && selected[0]) || "" })
+                        <AbsSelect
+                            mult={false}
+                            options={tankTypeOptions}
+                            selected={formData.tank_type ? [formData.tank_type] : []}
+                            placeholder="Select Tank Type"
+                            onChange={(s) =>
+                                setFormData(prev => ({ ...prev, tank_type: s?.[0] ?? "" }))
                             }
-                            options={[
-                                { text: "Bulk Carrier", value: "1" },
-                                { text: "Gas Carrier", value: "2" },
-                            ]}
-                            selected={[formData.tank_type]}
-                            placeholder="Select Tank  Type"
                         />
-                    </div>
 
+                    </div>
                     <div className="col-md-2 form-group">
-                        <Label name="Tank Name" bold />
-                        <AbsSelect mult={false}
-                            onChange={(selected: string[] | any) =>
-                                setFormData({ ...formData, tank_name: (selected && selected[0]) || "" })
+                        <Label name="Select a Tank Name" bold />
+                        <AbsSelect
+                            mult={false}
+                            options={tankNameOptions.map(o => ({
+                                text: o.text,
+                                value: o.value
+                            }))}
+                            selected={formData.tank_name ? [formData.tank_name] : []}
+                            placeholder="Select Tank Name"
+                            onChange={(s) =>
+                                setFormData(prev => ({ ...prev, tank_name: s?.[0] ?? "" }))
                             }
-                            options={[
-                                { text: "Bulk Carrier", value: "1" },
-                                { text: "Gas Carrier", value: "2" },
-                            ]}
-                            selected={[formData.tank_name]}
-                            placeholder="Select Tank  Name"
                         />
-                    </div>
 
+                    </div>
                     <div className="col-md-2 form-group">
                         <Label name="  Status" bold />
-                        <AbsSelect mult={false}
-                            onChange={(selected: string[] | any) =>
-                                setFormData({ ...formData, activation_status: (selected && selected[0]) || "" })
+                        <AbsSelect
+                            mult={false}
+                            options={statusOptions}
+                            selected={
+                                formData.activation_status === true
+                                    ? ["Active"]
+                                    : formData.activation_status === false
+                                        ? ["InActive"]
+                                        : []
                             }
-                            options={[
-                                { text: "Active", value: "1" },
-                                { text: "Inactive", value: "2" },
-                            ]}
-                            selected={[formData.activation_status]}
-                            placeholder="Select   Status"
+                            placeholder="Select Status"
+                            onChange={(s) =>
+                                setFormData(prev => ({
+                                    ...prev,
+                                    activation_status: s?.[0] === "Active"
+                                }))
+                            }
                         />
+
                     </div>
 
 
@@ -257,13 +274,13 @@ const ProjectTankList: React.FC = () => {
                         </div>
                         <div className="col-md-6 d-flex justify-content-end">
                             <div>
-                            <Button variant={BUTTONS.PRIMARY} onClick={() => { setStatusModel(true) }}>Change Status</Button></div>
+                                <Button variant={BUTTONS.PRIMARY} onClick={() => { setStatusModel(true) }}>Change Status</Button></div>
                         </div>
                     </div>
                     <div className="custom-react-table">
                         <AbsReactTable
                             columns={columns}
-                            data={data}
+                            data={tableRows}
                             pagination={true}
                             expand={false}
                             allowColumnsShowHide={false}
@@ -442,7 +459,7 @@ const ProjectTankList: React.FC = () => {
                                         checked={actstatus === 2}
                                         onChange={() => setActStatusModel(2)}
                                     />
-                                    
+
                                 </div>
                             </div>
                         </div>

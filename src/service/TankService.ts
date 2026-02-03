@@ -70,7 +70,7 @@ export function updateTank(
     const routePath = `/api/ProjectConfig/EditTank`;
     return axiosInstance.post(routePath, formData);
 }
-// TankService.ts
+
 export function deleteTank(
     tankId: string,
     IMO: string = "",
@@ -84,3 +84,50 @@ export function deleteTank(
         }
     });
 }
+export function updateTankStatus(payload: {
+    data: string[];
+    status: boolean;
+    IMO?: string;
+}) {
+    return axiosInstance.post(
+        "/api/Tank/ManageTankActiveCheckBox",
+        payload
+    );
+}
+export function ManageTankFilter_Project(IMO?: string): Promise<AxiosResponse> {
+    const routePath = `/api/Tank/ManageTankFilter_Project`;
+    return axiosInstance.get(routePath, {
+        params: { IMO }
+    });
+}
+
+export function ManageTankFilter_TankType(IMO?: string): Promise<AxiosResponse> {
+    const routePath = `/api/Tank/ManageTankFilter_TankType`;
+    return axiosInstance.get(routePath, {
+        params: { IMO }
+    });
+}
+export function ManageTankFilter_TankName(IMO?: string): Promise<AxiosResponse> {
+    const routePath = `/api/Tank/ManageTankFilter_TankName`;
+    return axiosInstance.get(routePath, {
+        params: { IMO }
+    });
+}
+
+export const getManageTanks = (params: {
+    imo?: string;
+    projectId?: string;
+}) => {
+    return axiosInstance.get<ManageTankResponse>(
+        "/api/ProjectConfig/ManageTank",
+        {
+            params: {
+                isActive: false,
+                imo: params.imo ?? null,
+                projectId: params.projectId ?? null,
+                tankRestoreFilter: 0,
+                searchRestoreFilter: 0
+            }
+        }
+    );
+};
