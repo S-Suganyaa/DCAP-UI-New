@@ -5,6 +5,8 @@ import ManageTankTemplateList from './ManageTankTemplateList';
 import { Modal, Offcanvas } from 'react-bootstrap';
 import * as tankService from '../../../../service/TankService';
 import * as gradingService from '../../../../service/GradingService';
+import InformationPopup from '../../../../Common/InformationPopup';
+
 interface ManageTankRow {
     tankId?: string;
     templateId?: number;
@@ -51,7 +53,8 @@ const ManageTankList: React.FC = () => {
     const [dataCount, setDataCount] = useState(0);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [bulkStatus, setBulkStatus] = useState<boolean>(true);
-
+    const [selectedTankNames, setSelectedTankNames] = useState<string[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
     const [hierarchicalFilters, setHierarchicalFilters] = useState<{
         vesselType?: string;
         tankName?: string;
@@ -73,6 +76,8 @@ const ManageTankList: React.FC = () => {
     const [selectedStatus, setSelectedStatus] = useState<number>(1);
     const [error, setError] = React.useState<boolean>();
     const [deletingTank, setDeletingTank] = useState<ManageTankRow | null>(null);
+    const [showInfoPopup, setShowInfoPopup] = useState(false);
+    const [popupPageName, setPopupPageName] = useState<string | undefined>();
 
     const initialFilterState = {
         searchType: "list",
@@ -157,55 +162,148 @@ const ManageTankList: React.FC = () => {
         setOpen(true);
     };
 
-
     const handleSaveTank = async () => {
         if (!formData.tankName.trim() || !formData.vesselText || !formData.tankTypeText.trim()) {
             setError(true);
             return;
         }
 
-        const payload = {
-            tankName: formData.tankName,
-            subheader: formData.subheader,
-            vesselType: formData.vesselText,
-            tankType: formData.tankTypeText,
-            status: formData.status
-        };
-        if (editingTankId) {
-            await tankService.updateTank({
-                ...payload,
-                tankId: editingTankId
-            });
-        } else {
-            await tankService.createTank(payload);
+        try {
+            const payload = {
+                tankName: formData.tankName,
+                subheader: formData.subheader,
+                vesselType: formData.vesselText,
+                tankType: formData.tankTypeText,
+                status: formData.status
+            };
+
+            if (editingTankId) {
+                await tankService.updateTank({
+                    ...payload,
+                    tankId: editingTankId
+                });
+
+                setPopupPageName("UpdateTank");
+            } else {
+                await tankService.createTank(payload);
+
+                setPopupPageName("CreateTank");
+            }
+
+            setShowInfoPopup(true);
+            setOpen(false);
+            resetForm();
+            loadTankList();
+
+        } catch (err) {
+            console.error("Save tank failed", err);
         }
-
-        setOpen(false);
-        resetForm();
-        loadTankList();
     };
-
     const handleDeleteTank = async () => {
         if (!deletingTank?.tankId) return;
 
         try {
             await tankService.deleteTank(
                 deletingTank.tankId,
-                "",   // IMO
-                0     // ProjectId
+                "",
+                0
             );
 
             setDeleteModel(false);
-
             setDeletingTank(null);
+
+            setPopupPageName("DeleteTank");
+            setShowInfoPopup(true);
 
             await loadTankList();
 
-            loadTankList(); // refresh grid
         } catch (err) {
             console.error("Delete Tank failed", err);
         }
     };
+    const handleBulkStatusUpdate = async () => {
+        setIsSaving(true);
+
+        try {
+            const response = await tankService.updateTankStatus({
+                data: selectedIds,
+                status: bulkStatus,
+                IMO: ""
+            });
+            console.log(response?.data.isSuccess, "update status reponse");
+            if (response?.data.isSuccess === true) {
+
+                // close confirm modal
+                setStatusModel(false);
+
+                // reset selections
+                setSelectedIds([]);
+                setSelectedTankNames([]);
+                setBulkStatus(true);
+
+                // show success popup
+                setPopupPageName("UpdateTankStatus");
+                setShowInfoPopup(true);
+
+                // refresh grid
+                await loadTankList();
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+
+    //const handleSaveTank = async () => {
+    //    if (!formData.tankName.trim() || !formData.vesselText || !formData.tankTypeText.trim()) {
+    //        setError(true);
+    //        return;
+    //    }
+
+    //    const payload = {
+    //        tankName: formData.tankName,
+    //        subheader: formData.subheader,
+    //        vesselType: formData.vesselText,
+    //        tankType: formData.tankTypeText,
+    //        status: formData.status
+    //    };
+    //    if (editingTankId) {
+    //        await tankService.updateTank({
+    //            ...payload,
+    //            tankId: editingTankId
+    //        });
+    //    } else {
+    //        await tankService.createTank(payload);
+    //    }
+
+    //    setOpen(false);
+    //    resetForm();
+    //    loadTankList();
+    //};
+
+    //const handleDeleteTank = async () => {
+    //    if (!deletingTank?.tankId) return;
+
+    //    try {
+    //        await tankService.deleteTank(
+    //            deletingTank.tankId,
+    //            "",   // IMO
+    //            0     // ProjectId
+    //        );
+
+    //        setDeleteModel(false);
+
+    //        setDeletingTank(null);
+
+    //        await loadTankList();
+
+    //        loadTankList(); // refresh grid
+    //    } catch (err) {
+    //        console.error("Delete Tank failed", err);
+    //    }
+    //};
 
 
     const resetForm = () => {
@@ -222,18 +320,24 @@ const ManageTankList: React.FC = () => {
         setTankOptions([]);
     };
 
-    const toggleRow = (tankId?: string) => {
-        if (!tankId) return;
+    const toggleRow = (row: ManageTankRow) => {
+        if (!row.tankId) return;
 
         setSelectedIds(prev => {
-            const exists = prev.includes(tankId);
-            const next = exists
-                ? prev.filter(id => id !== tankId)
-                : [...prev, tankId];
+            const exists = prev.includes(row.tankId!);
+            return exists
+                ? prev.filter(id => id !== row.tankId)
+                : [...prev, row.tankId!];
+        });
 
-            return next;
+        setSelectedTankNames(prev => {
+            const exists = prev.includes(row.tankName);
+            return exists
+                ? prev.filter(name => name !== row.tankName)
+                : [...prev, row.tankName];
         });
     };
+
 
 
     const loadTankList = async () => {
@@ -488,10 +592,11 @@ const ManageTankList: React.FC = () => {
                     <CheckboxInput
                         label=" "
                         checked={selectedIds.includes(row.original.tankId)}
-                        onChange={(e: any) => {
-                            toggleRow(row.original.tankId);
+                        onChange={() => {
+                            toggleRow(row.original);
                         }}
                     />
+
                 )
             },
 
@@ -556,46 +661,63 @@ const ManageTankList: React.FC = () => {
         }));
     }, []);
 
-    const handleBulkStatusUpdate = async () => {
-        try {
-            const response = await tankService.updateTankStatus({
-                data: selectedIds,
-                status: bulkStatus,
-                IMO: ""
-            });
+    //const handleBulkStatusUpdate = async () => {
+    //    try {
+    //        const response = await tankService.updateTankStatus({
+    //            data: selectedIds,
+    //            status: bulkStatus,
+    //            IMO: ""
+    //        });
 
-            if (response?.data === true || response?.data?.success === true) {
+    //        if (response?.data === true || response?.data?.success === true) {
 
-                // close modal
-                setStatusModel(false);
+    //            // close modal
+    //            setStatusModel(false);
 
-                // clear selection
-                setSelectedIds([]);
+    //            // clear selection
+    //            setSelectedIds([]);
 
-                // reset radio to default Active
-                setBulkStatus(true);
+    //            // reset radio to default Active
+    //            setBulkStatus(true);
 
-                // refresh grid
-                await loadTankList();
-            }
-        } catch (e) {
+    //            // refresh grid
+    //            await loadTankList();
+    //        }
+    //    } catch (e) {
 
+    //    }
+    //};
+
+    const tankHeaderTitle = useMemo(() => {
+        if (hierarchicalFilters.tankName) {
+            return `${hierarchicalFilters.tankName} - Tank`;
         }
-    };
+        if (hierarchicalFilters.tankType) {
+            return `${hierarchicalFilters.tankType} - Tank`;
+        }
+        if (hierarchicalFilters.vesselType) {
+            return `${hierarchicalFilters.vesselType} - Tank`;
+        }
+        return "Tank";
+    }, [hierarchicalFilters]);
 
+    useEffect(() => {
+        if (showInfoPopup) {
+            const timer = setTimeout(() => {
+                setShowInfoPopup(false);
+                setPopupPageName(undefined);
+            }, 2000); // 2 seconds auto close
+
+            return () => clearTimeout(timer);
+        }
+    }, [showInfoPopup]);
 
 
     return (
         <>
             <div className="page-title">
                 <BreadcrumbBar
-                    pageName="Manage Tank"
-                    parentPages={[
-                        {
-                            name: "Project Configuration",
-                            link: ""
-                        }
-                    ]}>
+                >
                     <Button onClick={() => (setOpen(true))}> Add New Tank</Button>
                 </BreadcrumbBar>
             </div>
@@ -612,7 +734,7 @@ const ManageTankList: React.FC = () => {
 
                         <div className="row">
                             <div className="col-md-8">
-                                <h5 className='_600'>  Bulk Carrier - Additional Tank</h5>
+                                <h5 className='_600'>{tankHeaderTitle}</h5>
                             </div>
                             <div className="col-md-6 mb-3 mt-2">
                                 <div className="d-flex justify-content-start align-items-center gap-2">
@@ -835,8 +957,11 @@ const ManageTankList: React.FC = () => {
                                     <Icon.Exclamation size={24} />
                                 </div>
                                 <p className='_500 tx-14 text-center'>
-                                    Are you sure you want to change 'Mooring Winches with Foundations' status?
+                                    {selectedTankNames.length === 1
+                                        ? `Are you sure you want to change '${selectedTankNames[0]}' status?`
+                                        : `Are you sure you want to change status of ${selectedTankNames.length} tanks?`}
                                 </p>
+
                                 <div className='d-flex jusify-content-center flex-row'>
                                     <RadioInput
                                         label="Active"
@@ -865,6 +990,16 @@ const ManageTankList: React.FC = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+            {showInfoPopup && (
+                <InformationPopup
+                    show={showInfoPopup}
+                    pageName={popupPageName}
+                    onClose={() => {
+                        setShowInfoPopup(false);
+                        setPopupPageName(undefined);
+                    }}
+                />)}
+
         </>
     );
 };

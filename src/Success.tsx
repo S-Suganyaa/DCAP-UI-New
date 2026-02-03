@@ -14,7 +14,7 @@ const Success: React.FC = () => {
   useEffect(() => {
     // If no account, redirect to Project page immediately
     if (!account) {
-      navigate("/app/Project", { replace: true });
+        navigate("/app/Configuration/Managetemplate", { replace: true });
       return;
     }
 
@@ -47,7 +47,7 @@ const Success: React.FC = () => {
     } catch (error) {
       console.error("Error in Success component:", error);
       // Even on error, redirect to Project page
-      navigate("/app/Project", { replace: true });
+        navigate("/app/Configuration/Managetemplate", { replace: true });
     }
 
     function acquireToken(tokenRequest: any) {
@@ -64,18 +64,16 @@ const Success: React.FC = () => {
             event.newValue = token;
             window.dispatchEvent(event);
 
-            console.log("Token stored successfully");
           }
 
           setIsLoading(false);
           // Navigate to Project page immediately after token is stored
-          navigate("/app/Project", { replace: true });
+            navigate("/app/Configuration/Managetemplate", { replace: true });
         })
         .catch((error: any) => {
-          console.error("Token acquisition error:", error);
           setIsLoading(false);
           // Even on error, redirect to Project page
-          navigate("/app/Project", { replace: true });
+            navigate("/app/Configuration/Managetemplate", { replace: true });
         });
     }
   }, [account, instance, navigate]);

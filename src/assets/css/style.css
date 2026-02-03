@@ -1073,3 +1073,13 @@ a {
 a:hover {
   text-decoration: none !important;
 }/*# sourceMappingURL=style.css.map */
+
+.child-nav-link.active {
+    font-weight: 700;
+    color: #002a4e;
+}
+
+.nav-item.active > .nav-link {
+    background-color: #002a4e;
+    color: #fff;
+}
