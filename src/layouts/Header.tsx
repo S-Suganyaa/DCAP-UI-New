@@ -9,6 +9,11 @@ import { MsalContext, type IMsalContext } from '@azure/msal-react';
 
 const Header: React.FC = () => {
     const msalContext = React.useContext(MsalContext);
+    const account = msalContext.accounts?.[0];
+    const userName =
+        account?.name ||
+        account?.username ||   // fallback (email / UPN)
+        'User';
 
     async function handleLogout(e: React.MouseEvent<HTMLAnchorElement, MouseEvent>, value?: IMsalContext | null): Promise<void> {
         e.preventDefault();
@@ -48,7 +53,7 @@ const Header: React.FC = () => {
                                     <div className='d-flex align-items-center '>
                                         <div className='action-icons' >
                                             <Icon.PersonCircle size={20} /></div>
-                                        <div className='d-md-inline d-inline pl-2 pr-3'>OXPABS</div>
+                                        <div className='d-md-inline d-inline pl-2 pr-3'> {userName}</div>
 
                                     </div>
                                 </Dropdown.Toggle>

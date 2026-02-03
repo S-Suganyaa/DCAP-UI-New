@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BreadcrumbBar, Button, AbsReactTable, BUTTONS, Divider, Input, AbsSelect, AbsSearch, CheckboxInput, RadioInput, Label } from "customer_portal-ui-shared";
 import * as Icon from 'react-bootstrap-icons';
 import ManageGradingTemplateList from './ManageGradingTemplateList';
+import InformationPopup from '../../../../Common/InformationPopup';
 import { Modal, Offcanvas } from 'react-bootstrap';
 import * as gradingService from '../../../../service/GradingService';
 
@@ -46,11 +47,16 @@ const ManageGradingList: React.FC = () => {
         vesselType?: string;
         templateName?: string;
         sectionName?: string;
+        gradingName?: string;
     }>({});
     const [error, setError] = React.useState<boolean>();
     const [open, setOpen] = React.useState<boolean>();
     const [deleteModel, setDeleteModel] = React.useState<boolean>();
     const [selected, setSelected] = React.useState<number | undefined>();
+    const [showInfoPopup, setShowInfoPopup] = useState(false);
+    const [popupPageName, setPopupPageName] = useState<string | undefined>();
+    const [isSaving, setIsSaving] = useState(false);
+
     const [formData, setFormData] = useState<FormData>({
         vesselValue: null,
         vesselText: "",
@@ -231,7 +237,11 @@ const ManageGradingList: React.FC = () => {
                 item.sectionName === hierarchicalFilters.sectionName
             );
         }
-
+        if (hierarchicalFilters.gradingName) {
+            dataToPaginate = dataToPaginate.filter(item =>
+                item.gradingName === hierarchicalFilters.sectionName
+            );
+        }
         // Apply search text filter (templateName and sectionName)
         if (currentSearchText) {
             dataToPaginate = dataToPaginate.filter((item) => {
@@ -643,7 +653,7 @@ const ManageGradingList: React.FC = () => {
 
         setDeleteGradingId(row.gradingId);
         setDeleteTanktypeId(row.tanktypeId);
-        setDeletingGrading(row);   
+        setDeletingGrading(row);
         setDeleteModel(true);
     };
 
@@ -664,10 +674,24 @@ const ManageGradingList: React.FC = () => {
 
             loadGradings(); // reload table
         } catch (error) {
-           
+
         }
     };
 
+
+
+    const gradingHeaderTitle = useMemo(() => {
+        if (hierarchicalFilters.sectionName) {
+            return `${hierarchicalFilters.sectionName} - Grading`;
+        }
+        if (hierarchicalFilters.templateName) {
+            return `${hierarchicalFilters.templateName} - Grading`;
+        }
+        if (hierarchicalFilters.vesselType) {
+            return `${hierarchicalFilters.vesselType} - Grading`;
+        }
+        return "Grading";
+    }, [hierarchicalFilters]);
 
 
     return (
@@ -696,7 +720,7 @@ const ManageGradingList: React.FC = () => {
                     <div className="grid-content-body">
                         <div className="row">
                             <div className="col-md-8">
-                                <h5 className='_600'>Grading</h5>
+                                <h5 className='_600'>{gradingHeaderTitle}</h5>
                             </div>
                             <div className="col-md-6 mb-3 mt-2">
                                 <div className="d-flex justify-content-start align-items-center gap-2">
@@ -709,7 +733,7 @@ const ManageGradingList: React.FC = () => {
                                         handleSearch={() => {
                                             updateSearchApplied(val === "" ? null : val);
                                         }}
-                                        placeholder="Search by Part Name, Section Name"
+                                        placeholder="Search by Part Name, Section Name,Grading Name"
                                         searchApplied={searchApplied !== null}
                                     />
                                     <a onClick={() => handleClearFilter()} className="ml-3 text-nowrap text-underline">Clear Filters</a>
@@ -781,7 +805,7 @@ const ManageGradingList: React.FC = () => {
                                 }}
                                 placeholder="Select Vessel Template"
                             />
-                            {(error && (![formData.vesselValue] || formData.vesselValue == "")) ?
+                            {(error && (![formData.vesselValue] || formData.vesselValue == null)) ?
                                 <div><label style={{ color: 'red' }}> Please Select Vessel Type</label></div> :
                                 <></>
                             }
@@ -845,21 +869,25 @@ const ManageGradingList: React.FC = () => {
                                 }}
                                 placeholder="Select Section Name"
                             />
-                            {(error && (![formData.sectionValue] || formData.sectionValue == null)) ?
-                                <div><label style={{ color: 'red' }}> Please Select Section Name</label></div> :
-                                <></>
+                            {(error && (![formData.sectionValue] || !formData.sectionValue || formData.sectionValue == null)) ?
+                            <div><label style={{ color: 'red' }}> Please Select Section Name</label></div> :
+                            <></>
                             }
                         </div>
 
                         <div className="col-md-12 form-group">
                             <Label name="Grading Name" bold />
                             <Input
-                                placeholder="Enter Description Name"
+                                placeholder="Enter Grading Name"
                                 value={GradingName}
                                 onChange={(value) => {
                                     setGradingName(value);
                                 }}
                             />
+                            {(error && (!GradingName || GradingName == null)) ?
+                                <div><label style={{ color: 'red' }}> Grading Name required</label></div> :
+                                <></>
+                            }
                         </div>
 
                         <div className="col-md-12 form-group">
@@ -901,8 +929,8 @@ const ManageGradingList: React.FC = () => {
                         </div>
                         <div className="col-md-12 form-group">
                             <div className="d-flex gap-2">
-                                <Button variant={BUTTONS.SECONDARY}>Cancel</Button>
                                 <Button variant={BUTTONS.PRIMARY} onClick={handleCreate}>{editingGradingId ? "Update" : "Create"}</Button>
+                                <Button variant={BUTTONS.SECONDARY} onClick={() => setOpen(false)}>Cancel</Button>
 
                             </div>
                         </div>

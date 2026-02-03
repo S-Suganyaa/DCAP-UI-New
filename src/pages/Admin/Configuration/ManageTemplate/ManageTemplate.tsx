@@ -40,6 +40,7 @@ const ManageTemplate: React.FC = () => {
     const [selectedPartId, setSelectedPartId] = useState<number | null>(null);
     const [deletePartData, setDeletePartData] = useState<any>(null);
 
+
     const [newPart, setNewPart] = useState({
         sequenceNo: "",
         partName: "",
@@ -384,15 +385,13 @@ const ManageTemplate: React.FC = () => {
                                                             <td>{part.sequenceNo}</td>
                                                             <td>{part.partName}</td>
                                                             <td><CheckboxInput label=" " checked={part.isActive} /></td>
-                                                            <td>
-                                                                <Button variant={BUTTONS.TABLEDOWNLOAD} startIcon={<Icon.PencilFill />} onClick={() => {
+                                                            <td className="d-flex gap-2">
+                                                                <Button startIcon={<Icon.PencilFill />} onClick={() => {
                                                                     setEditPartId(part.partId);
                                                                     setEditPart({ ...part });
                                                                     setShowAddRow(false);
-                                                                }}>Edit</Button>
-                                                                <Button
-                                                                    variant={BUTTONS.TABLEDOWNLOAD}
-                                                                    startIcon={<Icon.TrashFill />}
+                                                                }}></Button>
+                                                                <Button startIcon={<Icon.TrashFill />}
                                                                     onClick={() => {
                                                                         setDeletePartData({
                                                                             vesselTypePartMappingId: part.partId,
@@ -405,7 +404,6 @@ const ManageTemplate: React.FC = () => {
                                                                         setDeletepartModel(true);
                                                                     }}
                                                                 >
-                                                                    Delete
                                                                 </Button>
                                                             </td>
                                                         </tr>
@@ -496,7 +494,7 @@ const ManageTemplate: React.FC = () => {
                                                             vesselTypeId={formData.vesselTypeId}
                                                             selectedPartId={formData.partId}
                                                             selectedPartName={selectedPartName}
-                                                            onRefresh={refreshTankSections} 
+                                                            onRefresh={refreshTankSections}
                                                         />
                                                     </>
                                                 ),

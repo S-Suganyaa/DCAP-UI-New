@@ -583,22 +583,22 @@ const ManageTankList: React.FC = () => {
         }
     };
 
-
+    const tankHeaderTitle = useMemo(() => {
+        if (hierarchicalFilters.tankName) {
+            return `${hierarchicalFilters.tankName} - Tank`;
+        }
+        if (hierarchicalFilters.tankType) {
+            return `${hierarchicalFilters.tankType} - Tank`;
+        }
+        if (hierarchicalFilters.vesselType) {
+            return `${hierarchicalFilters.vesselType} - Tank`;
+        }
+        return "Tank";
+    }, [hierarchicalFilters]);
 
     return (
         <>
-            <div className="page-title">
-                <BreadcrumbBar
-                    pageName="Manage Tank"
-                    parentPages={[
-                        {
-                            name: "Project Configuration",
-                            link: ""
-                        }
-                    ]}>
-                    <Button onClick={() => (setOpen(true))}> Add New Tank</Button>
-                </BreadcrumbBar>
-            </div>
+           
             <div className="page-content">
                 <div className="grid-container">
                     <div className="grid-sidebar">
@@ -612,7 +612,7 @@ const ManageTankList: React.FC = () => {
 
                         <div className="row">
                             <div className="col-md-8">
-                                <h5 className='_600'>  Bulk Carrier - Additional Tank</h5>
+                                <h5 className='_600'>{tankHeaderTitle}</h5>
                             </div>
                             <div className="col-md-6 mb-3 mt-2">
                                 <div className="d-flex justify-content-start align-items-center gap-2">
