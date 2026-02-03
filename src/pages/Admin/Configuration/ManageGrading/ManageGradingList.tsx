@@ -168,7 +168,7 @@ const ManageGradingList: React.FC = () => {
                 templateName: formData.partText,
                 sectionName: formData.sectionText,
                 gradingName: GradingName,
-                status: activationStatus === true,
+                isActive: activationStatus === true,
                 requiredInReport: reportStatus === true,
             };
 
@@ -181,8 +181,9 @@ const ManageGradingList: React.FC = () => {
                 vesselType: formData.vesselText,
                 templateName: formData.partText,
                 sectionName: formData.sectionText,
+                sectionId: formData.sectionValue,
                 gradingName: GradingName,
-                status: activationStatus === true,
+                isActive: activationStatus === true,
                 requiredInReport: reportStatus === true,
             };
 
