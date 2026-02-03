@@ -4,7 +4,9 @@ import Login from "../pages/Login/Login";
 import ManageDescriptionList from "../pages/Admin/Configuration/ManageDescription/ManageDescriptionList";
 import AppLayout from "../layouts/AppLayout";
 import ManageGradingList from "../pages/Admin/Configuration/ManageGrading/ManageGradingList";
-import ManageTankList from "../pages/Admin/Configuration/ManageTanks/ManageTankList";
+import Tanks from "../pages/Admin/Configuration/ManageTanks/Tanks";
+import ManageTemplate from "../pages/Admin/Configuration/ManageTemplate/ManageTemplate";
+
 import ProjectList from "../pages/Project/List";
 import Success from "../Success";
 
@@ -22,9 +24,9 @@ const AppRoutes = () => (
             <Route path="/app" element={<AppLayout />}>
                 <Route index element={<ProjectList />} />
                 <Route path="Project" element={<ProjectList />} />
-                <Route path="Configuration/Managetemplate" element={""} />
+                <Route path="Configuration/Managetemplate" element={<ManageTemplate />} />
                 <Route path="Configuration/Managedescriptions" element={<ManageDescriptionList />} />
-                <Route path="Configuration/Managetanks" element={<ManageTankList />} />
+                <Route path="Configuration/ManageTanks" element={<Tanks />} />
                 <Route path="Configuration/Manageabsgrading" element={<ManageGradingList />} />
             </Route>
 

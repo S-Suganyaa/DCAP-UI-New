@@ -29,8 +29,6 @@ type FormData = {
 
     grading_name: string;
 };
-
-// Around line 32
 type SelectOption = {
     text: string;
     value: number | string;  // Allow both number and string (for GUID)
